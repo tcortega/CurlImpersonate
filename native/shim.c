@@ -49,6 +49,50 @@ SHIM_EXPORT CURLcode shim_curl_easy_setopt_off_t(CURL *handle, CURLoption option
 }
 
 /*
+ * Wrap curl_easy_setopt for blob (struct curl_blob*) parameter type
+ * Used for: CURLOPT_SSLCERT_BLOB, CURLOPT_SSLKEY_BLOB, CURLOPT_CAINFO_BLOB, etc.
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_blob(CURL *handle, CURLoption option, struct curl_blob *blob)
+{
+    return curl_easy_setopt(handle, option, blob);
+}
+
+/*
+ * Callback setters - wrap curl_easy_setopt for function pointer options
+ * These use typedefs from curl/curl.h
+ */
+
+/* Set write callback for response body (CURLOPT_WRITEFUNCTION) */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_write_cb(CURL *handle, curl_write_callback callback)
+{
+    return curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, callback);
+}
+
+/* Set header callback (CURLOPT_HEADERFUNCTION) - same signature as write */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_header_cb(CURL *handle, curl_write_callback callback)
+{
+    return curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, callback);
+}
+
+/* Set read callback for request body (CURLOPT_READFUNCTION) */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_read_cb(CURL *handle, curl_read_callback callback)
+{
+    return curl_easy_setopt(handle, CURLOPT_READFUNCTION, callback);
+}
+
+/* Set transfer progress callback (CURLOPT_XFERINFOFUNCTION) */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_xferinfo_cb(CURL *handle, curl_xferinfo_callback callback)
+{
+    return curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, callback);
+}
+
+/* Set debug/verbose callback (CURLOPT_DEBUGFUNCTION) */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_debug_cb(CURL *handle, curl_debug_callback callback)
+{
+    return curl_easy_setopt(handle, CURLOPT_DEBUGFUNCTION, callback);
+}
+
+/*
  * Forward curl_easy_impersonate
  * Configures the CURL handle to impersonate a specific browser's TLS fingerprint
  *
@@ -120,7 +164,122 @@ SHIM_EXPORT CURLcode shim_curl_easy_getinfo_double(CURL *handle, CURLINFO info, 
     return curl_easy_getinfo(handle, info, value);
 }
 
+/*
+ * Get info as curl_off_t (64-bit integer)
+ * Used for: CURLINFO_SIZE_UPLOAD_T, CURLINFO_SIZE_DOWNLOAD_T,
+ *           CURLINFO_TOTAL_TIME_T, CURLINFO_SPEED_DOWNLOAD_T, etc.
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_getinfo_off_t(CURL *handle, CURLINFO info, curl_off_t *value)
+{
+    return curl_easy_getinfo(handle, info, value);
+}
+
+/*
+ * Get info as slist (linked list)
+ * Used for: CURLINFO_SSL_ENGINES, CURLINFO_COOKIELIST
+ * Note: Caller must free with curl_slist_free_all()
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_getinfo_slist(CURL *handle, CURLINFO info, struct curl_slist **value)
+{
+    return curl_easy_getinfo(handle, info, value);
+}
+
 SHIM_EXPORT void shim_curl_easy_reset(CURL *handle)
 {
     curl_easy_reset(handle);
+}
+
+/* Duplicate an easy handle with all its options */
+SHIM_EXPORT CURL* shim_curl_easy_duphandle(CURL *handle)
+{
+    return curl_easy_duphandle(handle);
+}
+
+/* Get libcurl version string (returns pointer to static string) */
+SHIM_EXPORT const char* shim_curl_version(void)
+{
+    return curl_version();
+}
+
+/* ==========================================================================
+ * Multi interface
+ * ========================================================================== */
+
+/* Lifecycle */
+SHIM_EXPORT CURLM* shim_curl_multi_init(void)
+{
+    return curl_multi_init();
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_cleanup(CURLM *multi)
+{
+    return curl_multi_cleanup(multi);
+}
+
+/* Handle management */
+SHIM_EXPORT CURLMcode shim_curl_multi_add_handle(CURLM *multi, CURL *easy)
+{
+    return curl_multi_add_handle(multi, easy);
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_remove_handle(CURLM *multi, CURL *easy)
+{
+    return curl_multi_remove_handle(multi, easy);
+}
+
+/* Driving transfers */
+SHIM_EXPORT CURLMcode shim_curl_multi_perform(CURLM *multi, int *running_handles)
+{
+    return curl_multi_perform(multi, running_handles);
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_socket_action(CURLM *multi, curl_socket_t sockfd,
+                                                     int ev_bitmask, int *running_handles)
+{
+    return curl_multi_socket_action(multi, sockfd, ev_bitmask, running_handles);
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_poll(CURLM *multi, struct curl_waitfd *extra_fds,
+                                            unsigned int extra_nfds, int timeout_ms, int *numfds)
+{
+    return curl_multi_poll(multi, extra_fds, extra_nfds, timeout_ms, numfds);
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_wakeup(CURLM *multi)
+{
+    return curl_multi_wakeup(multi);
+}
+
+/* Getting results */
+SHIM_EXPORT CURLMsg* shim_curl_multi_info_read(CURLM *multi, int *msgs_in_queue)
+{
+    return curl_multi_info_read(multi, msgs_in_queue);
+}
+
+/* Error handling */
+SHIM_EXPORT const char* shim_curl_multi_strerror(CURLMcode code)
+{
+    return curl_multi_strerror(code);
+}
+
+/* Setopt variants */
+SHIM_EXPORT CURLMcode shim_curl_multi_setopt_long(CURLM *multi, CURLMoption option, long value)
+{
+    return curl_multi_setopt(multi, option, value);
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_setopt_ptr(CURLM *multi, CURLMoption option, void *value)
+{
+    return curl_multi_setopt(multi, option, value);
+}
+
+/* Callback setters */
+SHIM_EXPORT CURLMcode shim_curl_multi_setopt_socket_cb(CURLM *multi, curl_socket_callback callback)
+{
+    return curl_multi_setopt(multi, CURLMOPT_SOCKETFUNCTION, callback);
+}
+
+SHIM_EXPORT CURLMcode shim_curl_multi_setopt_timer_cb(CURLM *multi, curl_multi_timer_callback callback)
+{
+    return curl_multi_setopt(multi, CURLMOPT_TIMERFUNCTION, callback);
 }
