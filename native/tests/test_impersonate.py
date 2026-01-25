@@ -119,7 +119,7 @@ async def _read_proc_output(proc, timeout: int = 5):
     return data
 
 
-async def _wait_nghttpd(proc):
+async def _wait_nghttpd(proc, port=8443):
     """Wait for nghttpd to start listening on its designated port."""
     data = bytes()
     while data is not None:
@@ -128,21 +128,26 @@ async def _wait_nghttpd(proc):
             return False
 
         line = data.decode("utf-8").rstrip()
-        if "listen 0.0.0.0:8443" in line:
+        if f"listen 0.0.0.0:{port}" in line:
             return True
 
     return False
 
 
 @pytest.fixture
-async def nghttpd():
-    """Initialize an HTTP/2 server for testing."""
-    logging.debug("Running nghttpd on :8443")
+async def nghttpd(worker_nghttpd_port):
+    """Initialize an HTTP/2 server for testing.
+
+    Uses worker_nghttpd_port fixture to get unique port per pytest-xdist worker,
+    enabling parallel test execution without port conflicts.
+    """
+    port = worker_nghttpd_port
+    logging.debug(f"Running nghttpd on :{port}")
 
     proc = await asyncio.create_subprocess_exec(
         "nghttpd",
         "-v",
-        "8443",
+        str(port),
         "ssl/server.key",
         "ssl/server.crt",
         stdout=asyncio.subprocess.PIPE,
@@ -150,12 +155,14 @@ async def nghttpd():
     )
 
     try:
-        started = await asyncio.wait_for(_wait_nghttpd(proc), timeout=3)
+        started = await asyncio.wait_for(_wait_nghttpd(proc, port), timeout=3)
         if not started:
-            raise Exception("nghttpd failed to start")
+            raise Exception(f"nghttpd failed to start on port {port}")
     except asyncio.TimeoutError:
-        raise Exception("nghttpd failed to start on time")
+        raise Exception(f"nghttpd failed to start on port {port} on time")
 
+    # Attach port to the process object so tests can access it
+    proc.port = port
     yield proc
 
     proc.terminate()
@@ -314,7 +321,7 @@ async def test_http2_headers(
         curl_binary,
         env_vars=env_vars,
         extra_args=["-k"],
-        urls=["https://localhost:8443"],
+        urls=[f"https://localhost:{nghttpd.port}"],
     )
     assert ret == 0
 
@@ -368,7 +375,7 @@ async def test_no_builtin_headers(
         curl_binary,
         env_vars=env_vars,
         extra_args=["-k"] + header_args,
-        urls=["https://localhost:8443"],
+        urls=[f"https://localhost:{nghttpd.port}"],
     )
     assert ret == 0
 
@@ -409,7 +416,7 @@ async def test_user_agent(pytestconfig, nghttpd, curl_binary, env_vars):
         curl_binary,
         env_vars=env_vars,
         extra_args=["-k", "-H", f"User-Agent: {user_agent}"],
-        urls=["https://localhost:8443"],
+        urls=[f"https://localhost:{nghttpd.port}"],
     )
     assert ret == 0
 
@@ -458,7 +465,7 @@ async def test_user_agent_curlopt_useragent(
         curl_binary,
         env_vars=env_vars,
         extra_args=["-k", "-A", user_agent],
-        urls=["https://localhost:8443"],
+        urls=[f"https://localhost:{nghttpd.port}"],
     )
     assert ret == 0
 

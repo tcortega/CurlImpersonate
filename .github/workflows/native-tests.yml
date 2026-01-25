@@ -51,11 +51,11 @@ jobs:
           sudo python3 -m pytest test_impersonate.py::test_tls_client_hello \
             --install-dir . --capture-interface eth0 -v -n 4 --tb=short
 
-      - name: Run HTTP/2 tests
+      - name: Run HTTP/2 tests (parallel)
         run: |
           cd native/build/tests
           python3 -m pytest test_impersonate.py::test_http2_headers \
-            --install-dir . -v --tb=short
+            --install-dir . -v -n 4 --tb=short
 
   test-macos:
     runs-on: macos-latest
@@ -95,8 +95,8 @@ jobs:
           sudo python3 -m pytest test_impersonate.py::test_tls_client_hello \
             --install-dir . --capture-interface en0 -v -n 4 --tb=short
 
-      - name: Run HTTP/2 tests
+      - name: Run HTTP/2 tests (parallel)
         run: |
           cd native/build/tests
           python3 -m pytest test_impersonate.py::test_http2_headers \
-            --install-dir . -v --tb=short
+            --install-dir . -v -n 4 --tb=short

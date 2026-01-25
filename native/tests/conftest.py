@@ -32,3 +32,25 @@ def worker_port_range():
 
     base_port = 50000 + (worker_num * 200)
     return (base_port, base_port + 100)
+
+
+@pytest.fixture
+def worker_nghttpd_port():
+    """
+    Assign unique nghttpd port per pytest-xdist worker.
+
+    Each worker gets a unique port for its nghttpd instance to avoid
+    conflicts when running HTTP/2 tests in parallel.
+
+    Worker gw0: 8443
+    Worker gw1: 8444
+    Worker gw2: 8445
+    etc.
+    """
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+    if worker_id == "master" or not worker_id.startswith("gw"):
+        worker_num = 0
+    else:
+        worker_num = int(worker_id.replace("gw", ""))
+
+    return 8443 + worker_num
