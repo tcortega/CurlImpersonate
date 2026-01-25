@@ -39,9 +39,9 @@ def browser_signatures():
     return docs
 
 
-# When running curl use a specific range of local ports.
-# This ensures we will capture the correct traffic in tcpdump.
-LOCAL_PORTS = (50000, 50100)
+# Default port range (used when not running with pytest-xdist)
+# When running in parallel, each worker gets its own port range via worker_port_range fixture
+DEFAULT_LOCAL_PORTS = (50000, 50100)
 
 # Test URLs for TLS fingerprint validation
 TEST_URLS = [
@@ -63,11 +63,16 @@ def test_urls():
 
 
 @pytest.fixture
-def tcpdump(pytestconfig):
-    """Initialize a sniffer to capture curl's traffic."""
-    interface = pytestconfig.getoption("capture_interface")
+def tcpdump(pytestconfig, worker_port_range):
+    """Initialize a sniffer to capture curl's traffic.
 
-    logging.debug(f"Running tcpdump on interface {interface}")
+    Uses worker_port_range fixture to get unique port range per pytest-xdist worker,
+    enabling parallel test execution without packet capture conflicts.
+    """
+    interface = pytestconfig.getoption("capture_interface")
+    local_ports = worker_port_range
+
+    logging.debug(f"Running tcpdump on interface {interface}, ports {local_ports[0]}-{local_ports[1]}")
 
     p = subprocess.Popen(
         [
@@ -81,9 +86,9 @@ def tcpdump(pytestconfig):
             "-",
             "-U",  # Important, makes tcpdump unbuffered
             (
-                f"(tcp src portrange {LOCAL_PORTS[0]}-{LOCAL_PORTS[1]}"
+                f"(tcp src portrange {local_ports[0]}-{local_ports[1]}"
                 f" and tcp dst port 443) or"
-                f"(tcp dst portrange {LOCAL_PORTS[0]}-{LOCAL_PORTS[1]}"
+                f"(tcp dst portrange {local_ports[0]}-{local_ports[1]}"
                 f" and tcp src port 443)"
             ),
         ],
@@ -157,8 +162,18 @@ async def nghttpd():
     await proc.wait()
 
 
-def _run_curl(pytestconfig, curl_binary, env_vars, extra_args, urls, output="/dev/null"):
-    """Run minicurl with the given environment and arguments."""
+def _run_curl(pytestconfig, curl_binary, env_vars, extra_args, urls, local_ports=None, output="/dev/null"):
+    """Run minicurl with the given environment and arguments.
+
+    Args:
+        pytestconfig: pytest config object
+        curl_binary: name of the curl binary to run
+        env_vars: environment variables to set
+        extra_args: additional command line arguments
+        urls: URLs to request
+        local_ports: tuple of (start, end) port range for --local-port
+        output: output file path
+    """
     env = os.environ.copy()
     if env_vars:
         env.update(env_vars)
@@ -167,6 +182,10 @@ def _run_curl(pytestconfig, curl_binary, env_vars, extra_args, urls, output="/de
     curl_binary = os.path.join(
         pytestconfig.getoption("install_dir"), curl_binary
     )
+
+    # Use provided port range or default
+    if local_ports is None:
+        local_ports = DEFAULT_LOCAL_PORTS
 
     logging.debug(f"Launching '{curl_binary}' to {urls}")
     if env_vars:
@@ -183,7 +202,7 @@ def _run_curl(pytestconfig, curl_binary, env_vars, extra_args, urls, output="/de
         "-o",
         output,
         "--local-port",
-        f"{LOCAL_PORTS[0]}-{LOCAL_PORTS[1]}",
+        f"{local_ports[0]}-{local_ports[1]}",
     ]
     if extra_args:
         args += extra_args
@@ -207,6 +226,7 @@ def test_tls_client_hello(
     browser_signatures,
     expected_signature,
     test_urls,
+    worker_port_range,
 ):
     """
     Check that curl's TLS signature is identical to that of a real browser.
@@ -220,7 +240,7 @@ def test_tls_client_hello(
         pytest.skip("LD_PRELOAD not needed for shim-based tests")
 
     test_urls = test_urls[0:2]
-    ret = _run_curl(pytestconfig, curl_binary, env_vars=env_vars, extra_args=None, urls=test_urls)
+    ret = _run_curl(pytestconfig, curl_binary, env_vars=env_vars, extra_args=None, urls=test_urls, local_ports=worker_port_range)
     assert ret == 0
 
     try:

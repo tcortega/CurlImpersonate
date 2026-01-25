@@ -1,4 +1,6 @@
 pyyaml
 pytest
 pytest-asyncio
+pytest-xdist
+dpkt
 th1 @ git+https://github.com/lexiforest/th1.git@main
