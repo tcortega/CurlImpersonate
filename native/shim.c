@@ -92,6 +92,43 @@ SHIM_EXPORT CURLcode shim_curl_easy_setopt_debug_cb(CURL *handle, curl_debug_cal
     return curl_easy_setopt(handle, CURLOPT_DEBUGFUNCTION, callback);
 }
 
+/* Socket option callback (CURLOPT_SOCKOPTFUNCTION)
+ * Called after socket creation to allow setting socket options
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_sockopt_cb(CURL *handle,
+    int (*callback)(void *clientp, curl_socket_t curlfd, curlsocktype purpose))
+{
+    return curl_easy_setopt(handle, CURLOPT_SOCKOPTFUNCTION, callback);
+}
+
+/* Open socket callback (CURLOPT_OPENSOCKETFUNCTION)
+ * Called to create sockets - allows custom socket creation
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_opensocket_cb(CURL *handle,
+    curl_socket_t (*callback)(void *clientp, curlsocktype purpose, struct curl_sockaddr *address))
+{
+    return curl_easy_setopt(handle, CURLOPT_OPENSOCKETFUNCTION, callback);
+}
+
+/* Close socket callback (CURLOPT_CLOSESOCKETFUNCTION)
+ * Called when curl wants to close a socket
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_closesocket_cb(CURL *handle,
+    int (*callback)(void *clientp, curl_socket_t item))
+{
+    return curl_easy_setopt(handle, CURLOPT_CLOSESOCKETFUNCTION, callback);
+}
+
+/* Seek callback (CURLOPT_SEEKFUNCTION)
+ * Called when curl needs to seek in the input stream (e.g., retry upload)
+ * Return: CURL_SEEKFUNC_OK (0), CURL_SEEKFUNC_FAIL (1), or CURL_SEEKFUNC_CANTSEEK (2)
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_setopt_seek_cb(CURL *handle,
+    int (*callback)(void *clientp, curl_off_t offset, int origin))
+{
+    return curl_easy_setopt(handle, CURLOPT_SEEKFUNCTION, callback);
+}
+
 /*
  * Forward curl_easy_impersonate
  * Configures the CURL handle to impersonate a specific browser's TLS fingerprint
@@ -124,14 +161,26 @@ SHIM_EXPORT CURLcode shim_curl_easy_perform(CURL *handle)
     return curl_easy_perform(handle);
 }
 
-SHIM_EXPORT void shim_curl_global_init(long flags)
+/* Pause/unpause a transfer (useful for async flow control) */
+SHIM_EXPORT CURLcode shim_curl_easy_pause(CURL *handle, int bitmask)
 {
-    curl_global_init(flags);
+    return curl_easy_pause(handle, bitmask);
+}
+
+SHIM_EXPORT CURLcode shim_curl_global_init(long flags)
+{
+    return curl_global_init(flags);
 }
 
 SHIM_EXPORT void shim_curl_global_cleanup(void)
 {
     curl_global_cleanup();
+}
+
+/* Free memory allocated by curl (needed for some getinfo results) */
+SHIM_EXPORT void shim_curl_free(void *ptr)
+{
+    curl_free(ptr);
 }
 
 SHIM_EXPORT const char* shim_curl_easy_strerror(CURLcode code)
@@ -184,6 +233,14 @@ SHIM_EXPORT CURLcode shim_curl_easy_getinfo_slist(CURL *handle, CURLINFO info, s
     return curl_easy_getinfo(handle, info, value);
 }
 
+/* Get socket info - returns curl_socket_t, not long
+ * Used for: CURLINFO_ACTIVESOCKET, CURLINFO_LASTSOCKET
+ */
+SHIM_EXPORT CURLcode shim_curl_easy_getinfo_socket(CURL *handle, CURLINFO info, curl_socket_t *value)
+{
+    return curl_easy_getinfo(handle, info, value);
+}
+
 SHIM_EXPORT void shim_curl_easy_reset(CURL *handle)
 {
     curl_easy_reset(handle);
@@ -199,6 +256,14 @@ SHIM_EXPORT CURL* shim_curl_easy_duphandle(CURL *handle)
 SHIM_EXPORT const char* shim_curl_version(void)
 {
     return curl_version();
+}
+
+/* Get detailed version information struct
+ * The returned pointer is to static data - do not free
+ */
+SHIM_EXPORT curl_version_info_data* shim_curl_version_info(CURLversion version)
+{
+    return curl_version_info(version);
 }
 
 /* ==========================================================================
@@ -282,4 +347,20 @@ SHIM_EXPORT CURLMcode shim_curl_multi_setopt_socket_cb(CURLM *multi, curl_socket
 SHIM_EXPORT CURLMcode shim_curl_multi_setopt_timer_cb(CURLM *multi, curl_multi_timer_callback callback)
 {
     return curl_multi_setopt(multi, CURLMOPT_TIMERFUNCTION, callback);
+}
+
+/* Associate user data with a socket in multi interface
+ * Used with CURLMOPT_SOCKETFUNCTION for async event loops
+ */
+SHIM_EXPORT CURLMcode shim_curl_multi_assign(CURLM *multi, curl_socket_t sockfd, void *sockptr)
+{
+    return curl_multi_assign(multi, sockfd, sockptr);
+}
+
+/* Get the timeout value for select/poll
+ * Returns how long to wait before calling curl_multi_socket_action with CURL_SOCKET_TIMEOUT
+ */
+SHIM_EXPORT CURLMcode shim_curl_multi_timeout(CURLM *multi, long *timeout_ms)
+{
+    return curl_multi_timeout(multi, timeout_ms);
 }
