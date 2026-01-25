@@ -172,3 +172,4 @@ Desktop.ini
 secrets.json
 appsettings.Development.json
 appsettings.Local.json
+__pycache__

@@ -119,3 +119,8 @@ SHIM_EXPORT CURLcode shim_curl_easy_getinfo_double(CURL *handle, CURLINFO info, 
 {
     return curl_easy_getinfo(handle, info, value);
 }
+
+SHIM_EXPORT void shim_curl_easy_reset(CURL *handle)
+{
+    curl_easy_reset(handle);
+}
