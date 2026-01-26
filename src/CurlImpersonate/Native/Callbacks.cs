@@ -79,7 +79,7 @@ public delegate int SocketCallback(nint curl, nint sockfd, int what, nint client
 /// <param name="clientp">User-provided data pointer.</param>
 /// <returns>0 for success.</returns>
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-public delegate int TimerCallback(nint curlm, int timeoutMs, nint clientp);
+public delegate int TimerCallback(nint curlm, long timeoutMs, nint clientp);
 
 /// <summary>
 /// Debug info types for CURLOPT_DEBUGFUNCTION.

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using CurlImpersonate.Enums;
 
 namespace CurlImpersonate.Structs;
 
@@ -57,7 +58,7 @@ public struct CurlMsgData
     /// CURLcode result for completed transfers.
     /// </summary>
     [FieldOffset(0)]
-    public int Result;
+    public CurlCode Result;
 }
 
 /// <summary>

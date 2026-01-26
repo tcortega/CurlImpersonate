@@ -5,19 +5,19 @@ namespace CurlImpersonate.Native.SafeHandles;
 /// <summary>
 /// Safe handle wrapper for CURL* (curl easy handle).
 /// </summary>
-public sealed class SafeCurlHandle : SafeHandle
+public sealed class SafeCurlEasyHandle : SafeHandle
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="SafeCurlHandle"/> class.
+    /// Initializes a new instance of the <see cref="SafeCurlEasyHandle"/> class.
     /// </summary>
-    public SafeCurlHandle() : base(0, ownsHandle: true)
+    public SafeCurlEasyHandle() : base(0, ownsHandle: true)
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SafeCurlHandle"/> class with a pre-existing handle.
+    /// Initializes a new instance of the <see cref="SafeCurlEasyHandle"/> class with a pre-existing handle.
     /// </summary>
-    internal SafeCurlHandle(nint handle, bool ownsHandle) : base(0, ownsHandle)
+    internal SafeCurlEasyHandle(nint handle, bool ownsHandle) : base(0, ownsHandle)
     {
         SetHandle(handle);
     }
