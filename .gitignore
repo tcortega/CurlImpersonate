@@ -173,3 +173,5 @@ secrets.json
 appsettings.Development.json
 appsettings.Local.json
 __pycache__
+runtimes/
+curl_cffi/

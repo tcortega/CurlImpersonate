@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/.root/" />
+  <Folder Name="/src/">
+    <Project Path="src/CurlImpersonate/CurlImpersonate.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CurlImpersonate.Tests/CurlImpersonate.Tests.csproj" />
+  </Folder>
+</Solution>
