@@ -21,22 +21,22 @@ internal static partial class NativeMethods
     /// <summary>
     /// CURL_GLOBAL_ALL flag for curl_global_init.
     /// </summary>
-    public const long CURL_GLOBAL_ALL = 3;
+    public const long CurlGlobalAll = 3;
 
     /// <summary>
     /// CURL_GLOBAL_SSL flag.
     /// </summary>
-    public const long CURL_GLOBAL_SSL = 1;
+    public const long CurlGlobalSsl = 1;
 
     /// <summary>
     /// CURL_GLOBAL_WIN32 flag.
     /// </summary>
-    public const long CURL_GLOBAL_WIN32 = 2;
+    public const long CurlGlobalWin32 = 2;
 
     /// <summary>
     /// CURL_GLOBAL_NOTHING flag.
     /// </summary>
-    public const long CURL_GLOBAL_NOTHING = 0;
+    public const long CurlGlobalNothing = 0;
 
     // Global functions
 

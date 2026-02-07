@@ -9,3 +9,9 @@ int shim_easy_setopt(void* curl, int option, void* param) {
     }
     return (int)curl_easy_setopt(curl, (CURLoption)option, param);
 }
+
+int shim_easy_getinfo(void* curl, int info, void* param) {
+    // For curl_easy_getinfo, all info types expect a pointer that curl writes to.
+    // We simply pass the pointer through to the variadic function.
+    return (int)curl_easy_getinfo(curl, (CURLINFO)info, param);
+}

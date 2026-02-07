@@ -29,21 +29,21 @@ internal static partial class NativeMethods
     internal static partial CurlCode EasySetOpt(nint curl, CurlOption option, nint param);
 
     /// <summary>
-    /// Get information from a curl easy handle (pointer output).
+    /// Get information from a curl easy handle (pointer output, via shim for variadic handling).
     /// </summary>
-    [LibraryImport(CurlLibrary, EntryPoint = "curl_easy_getinfo")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo")]
     internal static partial CurlCode EasyGetInfo(nint curl, CurlInfo info, out nint value);
 
     /// <summary>
-    /// Get information from a curl easy handle (long output).
+    /// Get information from a curl easy handle (long output, via shim for variadic handling).
     /// </summary>
-    [LibraryImport(CurlLibrary, EntryPoint = "curl_easy_getinfo")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo")]
     internal static partial CurlCode EasyGetInfoLong(nint curl, CurlInfo info, out long value);
 
     /// <summary>
-    /// Get information from a curl easy handle (double output).
+    /// Get information from a curl easy handle (double output, via shim for variadic handling).
     /// </summary>
-    [LibraryImport(CurlLibrary, EntryPoint = "curl_easy_getinfo")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo")]
     internal static partial CurlCode EasyGetInfoDouble(nint curl, CurlInfo info, out double value);
 
     /// <summary>

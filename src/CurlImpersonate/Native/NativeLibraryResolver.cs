@@ -9,7 +9,7 @@ namespace CurlImpersonate.Native;
 internal static class NativeLibraryResolver
 {
     private static bool _initialized;
-    private static readonly object _lock = new();
+    private static readonly Lock Lock = new();
 
     /// <summary>
     /// Initialize the native library resolver.
@@ -18,7 +18,7 @@ internal static class NativeLibraryResolver
     {
         if (_initialized) return;
 
-        lock (_lock)
+        lock (Lock)
         {
             if (_initialized) return;
 

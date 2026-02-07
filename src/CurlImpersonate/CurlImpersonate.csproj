@@ -13,6 +13,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="CurlImpersonate.Tests" />
+        <InternalsVisibleTo Include="CurlImpersonate.Http" />
     </ItemGroup>
 
     <ItemGroup>

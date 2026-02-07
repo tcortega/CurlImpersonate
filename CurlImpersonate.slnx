@@ -1,9 +1,15 @@
 <Solution>
   <Folder Name="/.root/" />
   <Folder Name="/src/">
+    <Project Path="src/CurlImpersonate.Http/CurlImpersonate.Http.csproj" />
     <Project Path="src/CurlImpersonate/CurlImpersonate.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CurlImpersonate.Http.Tests/CurlImpersonate.Http.Tests.csproj" />
     <Project Path="tests/CurlImpersonate.Tests/CurlImpersonate.Tests.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/CurlImpersonate.Http.Benchmarks/CurlImpersonate.Http.Benchmarks.csproj" />
+    <Project Path="benchmarks/CurlImpersonate.Http.Benchmarks.Server/CurlImpersonate.Http.Benchmarks.Server.csproj" />
   </Folder>
 </Solution>

@@ -16,7 +16,7 @@ public static class CurlGlobal
     /// </summary>
     /// <param name="flags">Initialization flags (default: CURL_GLOBAL_ALL).</param>
     /// <exception cref="CurlException">Thrown if initialization fails.</exception>
-    public static void Initialize(long flags = NativeMethods.CURL_GLOBAL_ALL)
+    public static void Initialize(long flags = NativeMethods.CurlGlobalAll)
     {
         if (Interlocked.CompareExchange(ref _initialized, 1, 0) != 0) return;
         
