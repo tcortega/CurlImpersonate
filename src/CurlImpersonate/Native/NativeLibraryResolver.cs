@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -36,10 +37,7 @@ internal static class NativeLibraryResolver
         if (TryLoadFromRuntimesFolder(platformLibraryName, out var handle))
             return handle;
 
-        if (TryLoadFromAssemblyDirectory(platformLibraryName, out handle))
-            return handle;
-
-        if (TryLoadFromSystemPaths(platformLibraryName, out handle))
+        if (TryLoadFromAssemblyDirectory(platformLibraryName, out handle) || TryLoadFromSystemPaths(platformLibraryName, out handle))
             return handle;
 
         // Let the default resolver try
@@ -63,28 +61,25 @@ internal static class NativeLibraryResolver
             return libraryName switch
             {
                 NativeMethods.ShimLibrary => "curl_shim.dll",
-                NativeMethods.CurlLibrary => "libcurl.dll",
                 _ => $"{libraryName}.dll"
             };
         }
-        else if (OperatingSystem.IsMacOS())
+
+        if (OperatingSystem.IsMacOS())
         {
             return libraryName switch
             {
                 NativeMethods.ShimLibrary => "libcurl_shim.dylib",
-                NativeMethods.CurlLibrary => "libcurl-impersonate.dylib",
                 _ => $"lib{libraryName}.dylib"
             };
         }
-        else // Linux and others
+
+        // Linux and others
+        return libraryName switch
         {
-            return libraryName switch
-            {
-                NativeMethods.ShimLibrary => "libcurl_shim.so",
-                NativeMethods.CurlLibrary => "libcurl-impersonate.so",
-                _ => $"lib{libraryName}.so"
-            };
-        }
+            NativeMethods.ShimLibrary => "libcurl_shim.so",
+            _ => $"lib{libraryName}.so"
+        };
     }
 
     private static string GetRid()
@@ -100,21 +95,22 @@ internal static class NativeLibraryResolver
 
         if (OperatingSystem.IsWindows())
             return $"win-{arch}";
+        
         if (OperatingSystem.IsMacOS())
             return $"osx-{arch}";
+        
         return $"linux-{arch}";
     }
 
+    [SuppressMessage("SingleFile", "IL3000:Avoid accessing Assembly file path when publishing as a single file")]
     private static string? GetBaseDirectory()
     {
-        // For single-file apps, Assembly.Location is empty, use AppContext.BaseDirectory instead
-#pragma warning disable IL3000 // Assembly.Location returns empty for single-file - we have a fallback
         var assemblyLocation = typeof(NativeLibraryResolver).Assembly.Location;
-#pragma warning restore IL3000
         if (!string.IsNullOrEmpty(assemblyLocation))
         {
             return Path.GetDirectoryName(assemblyLocation);
         }
+        
         return AppContext.BaseDirectory;
     }
 
@@ -159,7 +155,6 @@ internal static class NativeLibraryResolver
 
     private static bool TryLoadFromSystemPaths(string libraryName, out nint handle)
     {
-        // Try loading with just the library name - the OS will search system paths
         return NativeLibrary.TryLoad(libraryName, out handle);
     }
 }

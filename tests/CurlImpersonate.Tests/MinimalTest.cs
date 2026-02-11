@@ -8,9 +8,8 @@ public partial class MinimalTest
     [Fact]
     public void LoadLibrary_ShouldSucceed()
     {
-        // Just test loading the curl-impersonate library directly
-        var loaded = NativeLibrary.TryLoad("libcurl-impersonate.dylib", out var handle);
-        Assert.True(loaded, "Failed to load libcurl-impersonate.dylib");
+        var loaded = NativeLibrary.TryLoad("libcurl_shim.dylib", out var handle);
+        Assert.True(loaded, "Failed to load libcurl_shim.dylib");
         if (handle != 0)
             NativeLibrary.Free(handle);
     }
@@ -26,6 +25,6 @@ public partial class MinimalTest
         Assert.Contains("libcurl", version);
     }
 
-    [LibraryImport("libcurl-impersonate.dylib", EntryPoint = "curl_version")]
+    [LibraryImport("libcurl_shim", EntryPoint = "curl_version")]
     private static partial nint curl_version();
 }
