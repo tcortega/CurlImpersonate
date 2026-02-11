@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 # Configuration
-CURL_IMPERSONATE_VERSION = "v1.3.0"
+CURL_IMPERSONATE_VERSION = "v1.4.2"
 CURL_IMPERSONATE_REPO = "lexiforest/curl-impersonate"
 CURL_CFFI_PACKAGE = "curl_cffi"
 
@@ -203,25 +203,18 @@ def setup_vendor_from_extracted(extract_dir: Path, system: str):
     # Add curl_easy_impersonate declaration to easy.h
     patch_easy_h_for_impersonate()
 
-    # Find and copy libraries
-    if system == "darwin":
-        lib_patterns = ["*.dylib"]
+    # Find and copy static libraries (v1.4.2 ships mega static archives)
+    if system == "darwin" or system == "linux":
+        lib_patterns = ["*.a"]
     else:
         lib_patterns = ["*.so", "*.so.*"]
 
     for pattern in lib_patterns:
         for lib_file in extract_dir.rglob(pattern):
-            if lib_file.is_file() and "curl" in lib_file.name.lower():
+            if lib_file.is_file():
                 dest = VENDOR_LIB / lib_file.name
                 print(f"Copying library: {lib_file.name}")
                 shutil.copy2(lib_file, dest)
-
-                # Create symlinks for versioned libraries
-                if ".so." in lib_file.name:
-                    base_name = lib_file.name.split(".so.")[0] + ".so"
-                    symlink = VENDOR_LIB / base_name
-                    if not symlink.exists():
-                        symlink.symlink_to(lib_file.name)
 
     print(f"\nVendor directory set up at: {VENDOR_DIR}")
 
@@ -295,14 +288,13 @@ def setup_vendor_from_wheel(extract_dir: Path):
     VENDOR_INCLUDE.mkdir(parents=True, exist_ok=True)
     VENDOR_LIB.mkdir(parents=True, exist_ok=True)
 
-    # Find DLLs in wheel
+    # Find DLLs in wheel (copy ALL — ssl, zstd, brotli needed too)
     dll_found = False
     for dll_file in extract_dir.rglob("*.dll"):
-        if "curl" in dll_file.name.lower() or "libcurl" in dll_file.name.lower():
-            dest = VENDOR_LIB / dll_file.name
-            print(f"Copying DLL: {dll_file.name}")
-            shutil.copy2(dll_file, dest)
-            dll_found = True
+        dest = VENDOR_LIB / dll_file.name
+        print(f"Copying DLL: {dll_file.name}")
+        shutil.copy2(dll_file, dest)
+        dll_found = True
 
     # Also copy any .lib files (import libraries)
     for lib_file in extract_dir.rglob("*.lib"):
