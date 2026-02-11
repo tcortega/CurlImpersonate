@@ -16,7 +16,7 @@ internal static partial class NativeMethods
     /// <summary>
     /// Library name for the main curl-impersonate library.
     /// </summary>
-    public const string CurlLibrary = "curl_shim";
+    public const string CurlLibrary = "curl";
 
     /// <summary>
     /// CURL_GLOBAL_ALL flag for curl_global_init.

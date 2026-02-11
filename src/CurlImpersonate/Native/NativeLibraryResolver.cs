@@ -61,6 +61,7 @@ internal static class NativeLibraryResolver
             return libraryName switch
             {
                 NativeMethods.ShimLibrary => "curl_shim.dll",
+                NativeMethods.CurlLibrary => "libcurl.dll",
                 _ => $"{libraryName}.dll"
             };
         }
@@ -70,6 +71,7 @@ internal static class NativeLibraryResolver
             return libraryName switch
             {
                 NativeMethods.ShimLibrary => "libcurl_shim.dylib",
+                NativeMethods.CurlLibrary => "libcurl_shim.dylib",
                 _ => $"lib{libraryName}.dylib"
             };
         }
@@ -78,6 +80,7 @@ internal static class NativeLibraryResolver
         return libraryName switch
         {
             NativeMethods.ShimLibrary => "libcurl_shim.so",
+            NativeMethods.CurlLibrary => "libcurl_shim.so",
             _ => $"lib{libraryName}.so"
         };
     }
