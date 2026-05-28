@@ -88,12 +88,17 @@ internal sealed class CurlEventLoop : IDisposable
                     ProcessWorkItem(item);
                 }
 
-                // If no pending transfers, wait briefly for new work
+                // If no pending transfers, block until work arrives (0% CPU when idle)
                 if (_pending.IsEmpty)
                 {
-                    if (_workQueue.TryTake(out var item, TimeSpan.FromMilliseconds(50)))
+                    try
                     {
+                        var item = _workQueue.Take();
                         ProcessWorkItem(item);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        break; // CompleteAdding was called — shut down
                     }
                     continue;
                 }
@@ -154,17 +159,21 @@ internal sealed class CurlEventLoop : IDisposable
             if (msg.Msg != CurlMsgType.Done)
                 continue;
 
+            // TryRemove is the synchronization gate: both cancellation
+            // (ProcessWorkItem) and completion (here) use it, ensuring
+            // only one path processes a given handle.
             if (!_pending.TryRemove(msg.EasyHandle, out var wrapper)) continue;
-            
-            NativeMethods.MultiRemoveHandle(_multi, wrapper.Handle);
 
             if (msg.Data.Result == CurlCode.Ok)
             {
-                wrapper.CompletionSource?.TrySetResult(wrapper.BuildResponse());
+                var response = wrapper.BuildResponse();
+                NativeMethods.MultiRemoveHandle(_multi, wrapper.Handle);
+                wrapper.CompletionSource?.TrySetResult(response);
             }
             else
             {
                 var errorMessage = wrapper.GetErrorMessage();
+                NativeMethods.MultiRemoveHandle(_multi, wrapper.Handle);
                 wrapper.CompletionSource?.TrySetException(
                     new CurlException(msg.Data.Result, errorMessage));
             }

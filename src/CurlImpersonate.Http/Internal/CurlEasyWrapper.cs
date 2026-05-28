@@ -10,7 +10,7 @@ namespace CurlImpersonate.Http.Internal;
 /// </summary>
 internal sealed unsafe class CurlEasyWrapper : IDisposable
 {
-    private readonly nint _handle;
+    private nint _handle;
     private GCHandle _gcHandle;
     private bool _disposed;
 
@@ -44,7 +44,14 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
     /// <summary>
     /// The raw curl easy handle pointer.
     /// </summary>
-    public nint Handle => _handle;
+    public nint Handle
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _handle;
+        }
+    }
 
     /// <summary>
     /// Whether this transfer has been aborted.
@@ -143,9 +150,7 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
     /// </summary>
     public void SetStringOption(CurlOption option, string value)
     {
-        var bytes = Encoding.UTF8.GetBytes(value + '\0');
-        var ptr = Marshal.AllocHGlobal(bytes.Length);
-        Marshal.Copy(bytes, 0, ptr, bytes.Length);
+        var ptr = Marshal.StringToCoTaskMemUTF8(value);
         _stringAllocations.Add(ptr);
         NativeMethods.EasySetOpt(_handle, option, ptr);
     }
@@ -156,12 +161,8 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
     /// </summary>
     public CurlCode SetLongOption(CurlOption option, long value)
     {
-        // The shim dereferences the pointer for numeric options,
-        // so we need to allocate memory for the value
-        var ptr = Marshal.AllocHGlobal(sizeof(long));
-        Marshal.WriteInt64(ptr, value);
-        _stringAllocations.Add(ptr);  // Reuse string allocations list for cleanup
-        return NativeMethods.EasySetOpt(_handle, option, ptr);
+        // The shim dereferences the pointer immediately, so a stack pointer is valid.
+        return NativeMethods.EasySetOpt(_handle, option, (nint)(&value));
     }
 
     /// <summary>
@@ -207,8 +208,10 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
         _eventLoop = null;
         Array.Clear(_errorBuffer);
 
-        // Note: callbacks will be re-set by SetupCallbacks after impersonation
-        // in ConfigureAsync, so we don't need to set them here
+        // Defensive: re-set callbacks so the handle is never in a bare state.
+        // ConfigureAsync calls SetupCallbacks() again after EasyImpersonate,
+        // which may override these.
+        SetupCallbacks();
     }
 
     private void FreeRequestBody()
@@ -232,9 +235,7 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
     private void FreeStringAllocations()
     {
         foreach (var ptr in _stringAllocations)
-        {
-            Marshal.FreeHGlobal(ptr);
-        }
+            Marshal.FreeCoTaskMem(ptr);
         _stringAllocations.Clear();
     }
 
@@ -258,10 +259,25 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
             return 0;
 
         var totalSize = (int)(size * nmemb);
-        var headerLine = Encoding.UTF8.GetString(ptr, totalSize).TrimEnd('\r', '\n');
 
-        if (!string.IsNullOrEmpty(headerLine))
+        // Trim trailing CRLF from raw bytes (avoids TrimEnd allocation)
+        var len = totalSize;
+        while (len > 0 && (ptr[len - 1] == '\r' || ptr[len - 1] == '\n'))
+            len--;
+
+        if (len <= 0) return size * nmemb;
+        var headerLine = Encoding.UTF8.GetString(ptr, len);
+
+        // HTTP status line marks a new response (redirect hop or final).
+        // Clear previous headers so only the final response's headers remain.
+        if (headerLine.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase))
+        {
+            wrapper._responseHeaders.Clear();
+        }
+        else
+        {
             wrapper._responseHeaders.Add(headerLine);
+        }
 
         return size * nmemb;
     }
@@ -281,7 +297,10 @@ internal sealed unsafe class CurlEasyWrapper : IDisposable
         // CRITICAL: Clean up curl handle FIRST, before freeing GCHandle
         // Curl may invoke callbacks during cleanup, which need valid GCHandle
         if (_handle != 0)
+        {
             NativeMethods.EasyCleanup(_handle);
+            _handle = 0;
+        }
 
         // Now safe to free pinned memory - curl no longer holds references
         if (_errorBufferHandle.IsAllocated)

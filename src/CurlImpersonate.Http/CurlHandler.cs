@@ -7,6 +7,10 @@ namespace CurlImpersonate.Http;
 /// </summary>
 public sealed class CurlHandler : HttpMessageHandler
 {
+    private static readonly Lazy<CurlEventLoop> SharedEventLoop = new(
+        () => new CurlEventLoop(), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private readonly CurlEventLoop? _ownedEventLoop;
     private readonly CurlEventLoop _eventLoop;
     private readonly CurlHandlePool _pool;
     private readonly CurlHandlerOptions _options;
@@ -27,7 +31,17 @@ public sealed class CurlHandler : HttpMessageHandler
         ArgumentNullException.ThrowIfNull(options);
 
         _options = options;
-        _eventLoop = new();
+
+        if (options.UseSharedEventLoop)
+        {
+            _eventLoop = SharedEventLoop.Value;
+        }
+        else
+        {
+            _ownedEventLoop = new CurlEventLoop();
+            _eventLoop = _ownedEventLoop;
+        }
+
         _pool = new(options);
     }
 
@@ -70,7 +84,7 @@ public sealed class CurlHandler : HttpMessageHandler
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0 && disposing)
         {
-            _eventLoop.Dispose();
+            _ownedEventLoop?.Dispose();
             _pool.Dispose();
         }
         base.Dispose(disposing);

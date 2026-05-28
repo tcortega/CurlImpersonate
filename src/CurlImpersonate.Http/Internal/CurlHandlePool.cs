@@ -9,7 +9,7 @@ namespace CurlImpersonate.Http.Internal;
 internal sealed class CurlHandlePool : IDisposable
 {
     private readonly ObjectPool<CurlEasyWrapper> _pool;
-    private readonly ConcurrentBag<CurlEasyWrapper> _allHandles = new();
+    private readonly ConcurrentDictionary<CurlEasyWrapper, byte> _allHandles = new();
     private bool _disposed;
 
     /// <summary>
@@ -50,6 +50,7 @@ internal sealed class CurlHandlePool : IDisposable
     /// </summary>
     public void Discard(CurlEasyWrapper wrapper)
     {
+        _allHandles.TryRemove(wrapper, out _);
         wrapper.Dispose();
     }
 
@@ -62,10 +63,11 @@ internal sealed class CurlHandlePool : IDisposable
         _disposed = true;
 
         // Dispose all tracked handles
-        foreach (var handle in _allHandles)
+        foreach (var handle in _allHandles.Keys)
         {
             handle.Dispose();
         }
+        _allHandles.Clear();
     }
 }
 
@@ -74,9 +76,9 @@ internal sealed class CurlHandlePool : IDisposable
 /// </summary>
 internal sealed class CurlHandlePoolPolicy : PooledObjectPolicy<CurlEasyWrapper>
 {
-    private readonly ConcurrentBag<CurlEasyWrapper> _tracker;
+    private readonly ConcurrentDictionary<CurlEasyWrapper, byte> _tracker;
 
-    public CurlHandlePoolPolicy(ConcurrentBag<CurlEasyWrapper> tracker)
+    public CurlHandlePoolPolicy(ConcurrentDictionary<CurlEasyWrapper, byte> tracker)
     {
         _tracker = tracker;
     }
@@ -85,7 +87,7 @@ internal sealed class CurlHandlePoolPolicy : PooledObjectPolicy<CurlEasyWrapper>
     public override CurlEasyWrapper Create()
     {
         var wrapper = new CurlEasyWrapper();
-        _tracker.Add(wrapper);
+        _tracker.TryAdd(wrapper, 0);
         return wrapper;
     }
 

@@ -51,4 +51,10 @@ public sealed class CurlHandlerOptions
     /// Skip SSL certificate verification. Use only for testing/development. Default is false.
     /// </summary>
     public bool InsecureSkipVerify { get; set; }
+
+    /// <summary>
+    /// When true, all CurlHandler instances with this option share a single background event loop thread.
+    /// Reduces thread count when using many handlers. Default is false (each handler gets its own loop).
+    /// </summary>
+    public bool UseSharedEventLoop { get; set; }
 }

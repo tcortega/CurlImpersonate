@@ -9,7 +9,8 @@ namespace CurlImpersonate;
 /// </summary>
 public static class CurlGlobal
 {
-    private static int _initialized;
+    private static readonly Lock Lock = new();
+    private static int _refCount;
 
     /// <summary>
     /// Initialize the curl library globally. This is called automatically via module initializer.
@@ -18,13 +19,16 @@ public static class CurlGlobal
     /// <exception cref="CurlException">Thrown if initialization fails.</exception>
     public static void Initialize(long flags = NativeMethods.CurlGlobalAll)
     {
-        if (Interlocked.CompareExchange(ref _initialized, 1, 0) != 0) return;
-        
-        var result = NativeMethods.GlobalInit(flags);
-        if (result == CurlCode.Ok) return;
-        
-        Interlocked.Exchange(ref _initialized, 0);
-        throw new CurlException(result, "Failed to initialize curl library");
+        lock (Lock)
+        {
+            if (_refCount == 0)
+            {
+                var result = NativeMethods.GlobalInit(flags);
+                if (result != CurlCode.Ok)
+                    throw new CurlException(result, "Failed to initialize curl library");
+            }
+            _refCount++;
+        }
     }
 
     /// <summary>
@@ -32,16 +36,21 @@ public static class CurlGlobal
     /// </summary>
     public static void Cleanup()
     {
-        if (Interlocked.CompareExchange(ref _initialized, 0, 1) == 1)
+        lock (Lock)
         {
-            NativeMethods.GlobalCleanup();
+            if (_refCount <= 0) return;
+            if (--_refCount == 0)
+                NativeMethods.GlobalCleanup();
         }
     }
 
     /// <summary>
     /// Gets whether the curl library has been initialized.
     /// </summary>
-    public static bool IsInitialized => _initialized == 1;
+    public static bool IsInitialized
+    {
+        get { lock (Lock) { return _refCount > 0; } }
+    }
 
     /// <summary>
     /// Gets the curl library version string.

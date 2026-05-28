@@ -93,15 +93,12 @@ internal static class RequestMapper
     {
         if (method == HttpMethod.Get)
         {
-            // Skip for GET - it's the default anyway, and impersonation sets it up
+            // Explicitly set for safety after pool reuse (clears residual POST state)
+            wrapper.SetLongOption(CurlOption.HttpGet, 1);
         }
         else if (method == HttpMethod.Post)
         {
             wrapper.SetLongOption(CurlOption.Post, 1);
-        }
-        else if (method == HttpMethod.Put)
-        {
-            wrapper.SetLongOption(CurlOption.Upload, 1);
         }
         else if (method == HttpMethod.Head)
         {
@@ -109,7 +106,10 @@ internal static class RequestMapper
         }
         else
         {
-            // Custom method
+            // PUT, DELETE, PATCH, OPTIONS, and any other method:
+            // CustomRequest sets the method name. If there's a body,
+            // SetRequestBody sets PostFields which triggers curl's POST
+            // data mechanism, and CustomRequest overrides the method name.
             wrapper.SetStringOption(CurlOption.CustomRequest, method.Method);
         }
     }
