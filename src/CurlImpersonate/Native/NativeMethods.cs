@@ -43,7 +43,7 @@ internal static partial class NativeMethods
     /// <summary>
     /// Initialize the curl library globally.
     /// </summary>
-    [LibraryImport(CurlLibrary, EntryPoint = "curl_global_init")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_global_init")]
     internal static partial CurlCode GlobalInit(long flags);
 
     /// <summary>

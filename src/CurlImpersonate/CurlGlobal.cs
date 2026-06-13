@@ -10,10 +10,12 @@ namespace CurlImpersonate;
 public static class CurlGlobal
 {
     private static readonly Lock Lock = new();
+    private static bool _initialized;
+    private static bool _processLifetimeInitialized;
     private static int _refCount;
 
     /// <summary>
-    /// Initialize the curl library globally. This is called automatically via module initializer.
+    /// Initialize the curl library globally.
     /// </summary>
     /// <param name="flags">Initialization flags (default: CURL_GLOBAL_ALL).</param>
     /// <exception cref="CurlException">Thrown if initialization fails.</exception>
@@ -21,13 +23,20 @@ public static class CurlGlobal
     {
         lock (Lock)
         {
-            if (_refCount == 0)
-            {
-                var result = NativeMethods.GlobalInit(flags);
-                if (result != CurlCode.Ok)
-                    throw new CurlException(result, "Failed to initialize curl library");
-            }
+            EnsureInitializedCore(flags);
             _refCount++;
+        }
+    }
+
+    /// <summary>
+    /// Ensures curl is globally initialized without taking a public cleanup reference.
+    /// </summary>
+    internal static void EnsureInitialized(long flags = NativeMethods.CurlGlobalAll)
+    {
+        lock (Lock)
+        {
+            EnsureInitializedCore(flags);
+            _processLifetimeInitialized = true;
         }
     }
 
@@ -38,9 +47,21 @@ public static class CurlGlobal
     {
         lock (Lock)
         {
-            if (_refCount <= 0) return;
-            if (--_refCount == 0)
-                NativeMethods.GlobalCleanup();
+            if (!_initialized)
+                return;
+
+            if (_refCount <= 0)
+                return;
+
+            if (--_refCount > 0)
+                return;
+
+            if (_processLifetimeInitialized)
+                return;
+
+            NativeMethods.GlobalCleanup();
+            _initialized = false;
+            _refCount = 0;
         }
     }
 
@@ -49,7 +70,17 @@ public static class CurlGlobal
     /// </summary>
     public static bool IsInitialized
     {
-        get { lock (Lock) { return _refCount > 0; } }
+        get { lock (Lock) { return _initialized; } }
+    }
+
+    internal static int ReferenceCount
+    {
+        get { lock (Lock) { return _refCount; } }
+    }
+
+    internal static bool HasProcessLifetimeInitialization
+    {
+        get { lock (Lock) { return _processLifetimeInitialized; } }
     }
 
     /// <summary>
@@ -62,5 +93,22 @@ public static class CurlGlobal
             var ptr = NativeMethods.Version();
             return ptr != 0 ? Marshal.PtrToStringAnsi(ptr) ?? "" : "";
         }
+    }
+
+    /// <summary>
+    /// Gets the runtime identifier used when resolving packaged native assets.
+    /// </summary>
+    public static string NativeRuntimeIdentifier => NativeLibraryResolver.GetRid();
+
+    private static void EnsureInitializedCore(long flags)
+    {
+        if (_initialized)
+            return;
+
+        var result = NativeMethods.GlobalInit(flags);
+        if (result != CurlCode.Ok)
+            throw new CurlException(result, "Failed to initialize curl library");
+
+        _initialized = true;
     }
 }

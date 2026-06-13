@@ -18,32 +18,50 @@ internal static partial class NativeMethods
     /// </summary>
     internal static nint EasyInit()
     {
-        CurlGlobal.Initialize();
+        CurlGlobal.EnsureInitialized();
         return EasyInitNative();
     }
 
     /// <summary>
-    /// Set an option on a curl easy handle (via shim for variadic handling).
+    /// Set a C long option on a curl easy handle.
     /// </summary>
-    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_setopt")]
-    internal static partial CurlCode EasySetOpt(nint curl, CurlOption option, nint param);
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_setopt_long")]
+    internal static partial CurlCode EasySetOptLong(nint curl, CurlOption option, long value);
 
     /// <summary>
-    /// Get information from a curl easy handle (pointer output, via shim for variadic handling).
+    /// Set a curl_off_t option on a curl easy handle.
     /// </summary>
-    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_setopt_off_t")]
+    internal static partial CurlCode EasySetOptOffT(nint curl, CurlOption option, long value);
+
+    /// <summary>
+    /// Set a pointer option on a curl easy handle.
+    /// </summary>
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_setopt_ptr")]
+    internal static partial CurlCode EasySetOptPointer(nint curl, CurlOption option, nint param);
+
+    /// <summary>
+    /// Get information from a curl easy handle (pointer output).
+    /// </summary>
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo_ptr")]
     internal static partial CurlCode EasyGetInfo(nint curl, CurlInfo info, out nint value);
 
     /// <summary>
-    /// Get information from a curl easy handle (long output, via shim for variadic handling).
+    /// Get information from a curl easy handle (C long output widened to Int64).
     /// </summary>
-    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo_long")]
     internal static partial CurlCode EasyGetInfoLong(nint curl, CurlInfo info, out long value);
 
     /// <summary>
-    /// Get information from a curl easy handle (double output, via shim for variadic handling).
+    /// Get information from a curl easy handle (curl_off_t output widened to Int64).
     /// </summary>
-    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo")]
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo_off_t")]
+    internal static partial CurlCode EasyGetInfoOffT(nint curl, CurlInfo info, out long value);
+
+    /// <summary>
+    /// Get information from a curl easy handle (double output).
+    /// </summary>
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_easy_getinfo_double")]
     internal static partial CurlCode EasyGetInfoDouble(nint curl, CurlInfo info, out double value);
 
     /// <summary>
@@ -81,6 +99,12 @@ internal static partial class NativeMethods
     /// </summary>
     [LibraryImport(CurlLibrary, EntryPoint = "curl_easy_upkeep")]
     internal static partial CurlCode EasyUpkeep(nint curl);
+
+    /// <summary>
+    /// Pause or unpause a transfer on a curl easy handle.
+    /// </summary>
+    [LibraryImport(CurlLibrary, EntryPoint = "curl_easy_pause")]
+    internal static partial CurlCode EasyPause(nint curl, int bitmask);
 
     /// <summary>
     /// Get the error message for a curl error code.

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <PackageId>CurlImpersonate.Http.DependencyInjection</PackageId>
+        <Title>CurlImpersonate.Http.DependencyInjection</Title>
+        <Description>IHttpClientFactory and dependency injection integration for the CurlImpersonate.Http curl-impersonate HttpMessageHandler.</Description>
+        <PackageReleaseNotes>Targets CurlImpersonate native assets built from lexiforest/curl-impersonate v1.5.6.</PackageReleaseNotes>
+
+        <IsAotCompatible>true</IsAotCompatible>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../CurlImpersonate.Http/CurlImpersonate.Http.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.2" />
+    </ItemGroup>
+
+</Project>

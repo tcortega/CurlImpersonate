@@ -8,6 +8,7 @@ namespace CurlImpersonate.Http.Benchmarks;
 /// Each invocation creates a new handler to measure fresh TLS negotiation.
 /// </summary>
 [MemoryDiagnoser]
+[AllStatisticsColumn]
 [RankColumn]
 [WarmupCount(BenchmarkConfig.WarmupCount)]
 [IterationCount(BenchmarkConfig.IterationCount)]

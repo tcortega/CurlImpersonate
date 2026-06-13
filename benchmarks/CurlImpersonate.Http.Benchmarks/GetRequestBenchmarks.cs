@@ -6,6 +6,7 @@ namespace CurlImpersonate.Http.Benchmarks;
 /// Benchmarks comparing GET request performance between native HttpClient and CurlHandler.
 /// </summary>
 [MemoryDiagnoser]
+[AllStatisticsColumn]
 [RankColumn]
 [WarmupCount(BenchmarkConfig.WarmupCount)]
 [IterationCount(BenchmarkConfig.IterationCount)]

@@ -10,7 +10,9 @@ public class MinimalTest
     public void LoadLibrary_ShouldSucceed()
     {
         var libraryName = GetPlatformLibraryName();
-        var loaded = NativeLibrary.TryLoad(libraryName, out var handle);
+        // The assembly overload probes the application directory; the bare-name
+        // overload is a raw dlopen and misses it on musl libc.
+        var loaded = NativeLibrary.TryLoad(libraryName, typeof(NativeMethods).Assembly, null, out var handle);
         Assert.True(loaded, $"Failed to load {libraryName}");
         if (handle != 0)
             NativeLibrary.Free(handle);

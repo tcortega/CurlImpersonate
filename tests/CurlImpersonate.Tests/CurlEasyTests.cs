@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using CurlImpersonate.Enums;
 using CurlImpersonate.Native;
+using CurlImpersonate.Native.SafeHandles;
 using Xunit;
 
 namespace CurlImpersonate.Tests;
@@ -30,7 +31,7 @@ public class CurlEasyTests
         var urlPtr = Marshal.StringToHGlobalAnsi(url);
         try
         {
-            var result = NativeMethods.EasySetOpt(curl, CurlOption.Url, urlPtr);
+            var result = NativeMethods.EasySetOptPointer(curl, CurlOption.Url, urlPtr);
             Assert.Equal(CurlCode.Ok, result);
         }
         finally
@@ -39,6 +40,16 @@ public class CurlEasyTests
             if (curl != 0)
                 NativeMethods.EasyCleanup(curl);
         }
+    }
+
+    [Fact]
+    public void SafeCurlSlistHandle_Append_ShouldCreateList()
+    {
+        using var list = new SafeCurlSlistHandle();
+
+        list.Append("Accept: */*");
+
+        Assert.NotEqual(0, list.Handle);
     }
 
     [Fact]
@@ -80,6 +91,26 @@ public class CurlEasyTests
         try
         {
             var result = NativeMethods.EasyImpersonate(curl, BrowserProfile.Safari2601.ToTargetString(), 1);
+            Assert.Equal(CurlCode.Ok, result);
+        }
+        finally
+        {
+            if (curl != 0)
+                NativeMethods.EasyCleanup(curl);
+        }
+    }
+
+    [Theory]
+    [InlineData(BrowserProfile.Chrome146)]
+    [InlineData(BrowserProfile.Firefox147)]
+    [InlineData(BrowserProfile.Safari260)]
+    [InlineData(BrowserProfile.Safari260Ios)]
+    public void EasyImpersonate_CurrentProfiles_ShouldSucceed(BrowserProfile profile)
+    {
+        var curl = NativeMethods.EasyInit();
+        try
+        {
+            var result = NativeMethods.EasyImpersonate(curl, profile.ToTargetString(), 1);
             Assert.Equal(CurlCode.Ok, result);
         }
         finally

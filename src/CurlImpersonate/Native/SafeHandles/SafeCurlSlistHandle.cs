@@ -36,7 +36,12 @@ public sealed class SafeCurlSlistHandle : SafeHandle
     /// <param name="data">The string to append.</param>
     public void Append(string data)
     {
+        ArgumentNullException.ThrowIfNull(data);
+
         var newHandle = NativeMethods.SlistAppend(handle, data);
+        if (newHandle == 0)
+            throw new OutOfMemoryException("curl_slist_append failed.");
+
         SetHandle(newHandle);
     }
 

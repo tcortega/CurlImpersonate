@@ -6,6 +6,7 @@ namespace CurlImpersonate.Http.Benchmarks;
 /// Benchmarks comparing POST request performance with varying body sizes.
 /// </summary>
 [MemoryDiagnoser]
+[AllStatisticsColumn]
 [RankColumn]
 [WarmupCount(BenchmarkConfig.WarmupCount)]
 [IterationCount(BenchmarkConfig.IterationCount)]

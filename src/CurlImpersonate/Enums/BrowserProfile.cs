@@ -5,7 +5,6 @@ namespace CurlImpersonate.Enums;
 /// </summary>
 public enum BrowserProfile
 {
-    // Chrome
     /// <summary>Chrome 99</summary>
     Chrome99,
     /// <summary>Chrome 100</summary>
@@ -34,20 +33,22 @@ public enum BrowserProfile
     Chrome133a,
     /// <summary>Chrome 136</summary>
     Chrome136,
-    /// <summary>Chrome 142 (latest)</summary>
+    /// <summary>Chrome 142</summary>
     Chrome142,
+    /// <summary>Chrome 145</summary>
+    Chrome145,
+    /// <summary>Chrome 146 (latest)</summary>
+    Chrome146,
     /// <summary>Chrome 99 Android</summary>
     Chrome99Android,
     /// <summary>Chrome 131 Android</summary>
     Chrome131Android,
 
-    // Edge
     /// <summary>Edge 99</summary>
     Edge99,
     /// <summary>Edge 101</summary>
     Edge101,
 
-    // Safari
     /// <summary>Safari 15.3</summary>
     Safari153,
     /// <summary>Safari 15.5</summary>
@@ -71,15 +72,15 @@ public enum BrowserProfile
     /// <summary>Safari 26.0 iOS</summary>
     Safari260Ios,
 
-    // Firefox
     /// <summary>Firefox 133</summary>
     Firefox133,
     /// <summary>Firefox 135</summary>
     Firefox135,
-    /// <summary>Firefox 144 (latest)</summary>
+    /// <summary>Firefox 144</summary>
     Firefox144,
+    /// <summary>Firefox 147 (latest)</summary>
+    Firefox147,
 
-    // Tor
     /// <summary>Tor Browser 145</summary>
     Tor145,
 }
@@ -94,7 +95,6 @@ public static class BrowserProfileExtensions
     /// </summary>
     public static string ToTargetString(this BrowserProfile profile) => profile switch
     {
-        // Chrome
         BrowserProfile.Chrome99 => "chrome99",
         BrowserProfile.Chrome100 => "chrome100",
         BrowserProfile.Chrome101 => "chrome101",
@@ -110,12 +110,12 @@ public static class BrowserProfileExtensions
         BrowserProfile.Chrome133a => "chrome133a",
         BrowserProfile.Chrome136 => "chrome136",
         BrowserProfile.Chrome142 => "chrome142",
+        BrowserProfile.Chrome145 => "chrome145",
+        BrowserProfile.Chrome146 => "chrome146",
         BrowserProfile.Chrome99Android => "chrome99_android",
         BrowserProfile.Chrome131Android => "chrome131_android",
-        // Edge
         BrowserProfile.Edge99 => "edge99",
         BrowserProfile.Edge101 => "edge101",
-        // Safari
         BrowserProfile.Safari153 => "safari153",
         BrowserProfile.Safari155 => "safari155",
         BrowserProfile.Safari170 => "safari170",
@@ -127,11 +127,10 @@ public static class BrowserProfileExtensions
         BrowserProfile.Safari260 => "safari260",
         BrowserProfile.Safari2601 => "safari2601",
         BrowserProfile.Safari260Ios => "safari260_ios",
-        // Firefox
         BrowserProfile.Firefox133 => "firefox133",
         BrowserProfile.Firefox135 => "firefox135",
         BrowserProfile.Firefox144 => "firefox144",
-        // Tor
+        BrowserProfile.Firefox147 => "firefox147",
         BrowserProfile.Tor145 => "tor145",
         _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, "Unknown browser profile")
     };
@@ -139,7 +138,7 @@ public static class BrowserProfileExtensions
     /// <summary>
     /// Default Chrome profile.
     /// </summary>
-    public static BrowserProfile DefaultChrome => BrowserProfile.Chrome142;
+    public static BrowserProfile DefaultChrome => BrowserProfile.Chrome146;
 
     /// <summary>
     /// Default Edge profile.
@@ -149,7 +148,7 @@ public static class BrowserProfileExtensions
     /// <summary>
     /// Default Safari profile.
     /// </summary>
-    public static BrowserProfile DefaultSafari => BrowserProfile.Safari2601;
+    public static BrowserProfile DefaultSafari => BrowserProfile.Safari260;
 
     /// <summary>
     /// Default Safari iOS profile.
@@ -159,7 +158,7 @@ public static class BrowserProfileExtensions
     /// <summary>
     /// Default Firefox profile.
     /// </summary>
-    public static BrowserProfile DefaultFirefox => BrowserProfile.Firefox144;
+    public static BrowserProfile DefaultFirefox => BrowserProfile.Firefox147;
 
     /// <summary>
     /// Default Tor profile.

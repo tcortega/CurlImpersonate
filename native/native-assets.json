@@ -1,0 +1,38 @@
+{
+  "version": "v1.5.6",
+  "repository": "lexiforest/curl-impersonate",
+  "assets": {
+    "linux-x64": {
+      "file": "libcurl-impersonate-v1.5.6.x86_64-linux-gnu.tar.gz",
+      "sha256": "f07e25084020c54d6fd5654c8d458e09b3a44c312f88e480c255399f00487b25"
+    },
+    "linux-arm64": {
+      "file": "libcurl-impersonate-v1.5.6.aarch64-linux-gnu.tar.gz",
+      "sha256": "b4e4f713655616efd2be83153d9057b5961c15e34563dde09a8b6798a8b331e9"
+    },
+    "linux-musl-x64": {
+      "file": "libcurl-impersonate-v1.5.6.x86_64-linux-musl.tar.gz",
+      "sha256": "eb09b887f5db80c24dfa00854868994754cca355818cf8586bb9889be50bea05"
+    },
+    "linux-musl-arm64": {
+      "file": "libcurl-impersonate-v1.5.6.aarch64-linux-musl.tar.gz",
+      "sha256": "d33c1550f787249cad3b929164412beef2b253a851df08d577b8cc5b9cf2ad01"
+    },
+    "osx-x64": {
+      "file": "libcurl-impersonate-v1.5.6.x86_64-macos.tar.gz",
+      "sha256": "05589344cac1ef5aaee89397c2070e45f12eeeba4f0cfba79780a28c46d8a751"
+    },
+    "osx-arm64": {
+      "file": "libcurl-impersonate-v1.5.6.arm64-macos.tar.gz",
+      "sha256": "00f89f687d9940d13642af90fd192d976897ffd35828e3d859d3fd02cf7fb31f"
+    },
+    "win-x64": {
+      "file": "libcurl-impersonate-v1.5.6.x86_64-win32.tar.gz",
+      "sha256": "fe8ce2488d5467fda6061b8b130b5834bc30cdfff40712692e8c5685dbbda6c7"
+    },
+    "win-arm64": {
+      "file": "libcurl-impersonate-v1.5.6.arm64-win32.tar.gz",
+      "sha256": "bf8e04e5162b1cf13ec5bac94b97f11fad3eca1125ecb73bdfe142cbe65d2590"
+    }
+  }
+}

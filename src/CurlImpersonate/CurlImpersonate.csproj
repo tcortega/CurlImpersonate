@@ -4,7 +4,20 @@
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <ImplicitUsings>enable</ImplicitUsings>
+
+        <PackageId>CurlImpersonate</PackageId>
+        <Title>CurlImpersonate</Title>
+        <Description>Low-level .NET bindings for curl-impersonate with packaged native curl-impersonate assets.</Description>
+        <PackageReleaseNotes>Targets lexiforest/curl-impersonate v1.5.6 native assets.</PackageReleaseNotes>
+        <CurlImpersonateNativeVersion>v1.5.6</CurlImpersonateNativeVersion>
+        <CurlImpersonateSupportedRuntimeIdentifiers>linux-x64;linux-arm64;linux-musl-x64;linux-musl-arm64;osx-x64;osx-arm64;win-x64;win-arm64</CurlImpersonateSupportedRuntimeIdentifiers>
+        <NativeBinariesPath Condition="'$(NativeBinariesPath)' == ''">$(MSBuildThisFileDirectory)..\..\</NativeBinariesPath>
+        <!-- /p:NativeBinariesPath is a global property; reassigning it is ignored,
+             so normalize the trailing slash into a private property instead -->
+        <_NativeBinariesRoot>$([MSBuild]::EnsureTrailingSlash('$(NativeBinariesPath)'))</_NativeBinariesRoot>
+        <CurlImpersonateHostRuntimeIdentifier>$([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)</CurlImpersonateHostRuntimeIdentifier>
 
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsAotCompatible>true</IsAotCompatible>
@@ -17,7 +30,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="../../runtimes/**/*" Pack="true" PackagePath="runtimes" />
+        <None Include="$(_NativeBinariesRoot)runtimes/**/*" Pack="true" PackagePath="runtimes" />
+        <None Include="../../native/native-assets.json" Pack="true" PackagePath="build/CurlImpersonate.native-assets.json" />
     </ItemGroup>
 
     <!-- Copy native libraries to output directory for local development -->
@@ -30,11 +44,19 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <Link>%(Filename)%(Extension)</Link>
         </None>
-        <None Include="../../runtimes/linux-x64/native/*" Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'X64'">
+        <None Include="../../runtimes/linux-x64/native/*" Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'X64' And '$(CurlImpersonateHostRuntimeIdentifier)' != 'linux-musl-x64'">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <Link>%(Filename)%(Extension)</Link>
         </None>
-        <None Include="../../runtimes/linux-arm64/native/*" Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'">
+        <None Include="../../runtimes/linux-arm64/native/*" Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64' And '$(CurlImpersonateHostRuntimeIdentifier)' != 'linux-musl-arm64'">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Link>%(Filename)%(Extension)</Link>
+        </None>
+        <None Include="../../runtimes/linux-musl-x64/native/*" Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$(CurlImpersonateHostRuntimeIdentifier)' == 'linux-musl-x64'">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Link>%(Filename)%(Extension)</Link>
+        </None>
+        <None Include="../../runtimes/linux-musl-arm64/native/*" Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$(CurlImpersonateHostRuntimeIdentifier)' == 'linux-musl-arm64'">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <Link>%(Filename)%(Extension)</Link>
         </None>

@@ -17,7 +17,7 @@ public class HttpTests
         var urlPtr = Marshal.StringToHGlobalAnsi(url);
         try
         {
-            var result = NativeMethods.EasySetOpt(curl, CurlOption.Url, urlPtr);
+            var result = NativeMethods.EasySetOptPointer(curl, CurlOption.Url, urlPtr);
             Assert.Equal(CurlCode.Ok, result);
         }
         finally
@@ -37,8 +37,16 @@ public class HttpTests
         var urlPtr = Marshal.StringToHGlobalAnsi(url);
         try
         {
-            var result = NativeMethods.EasySetOpt(curl, CurlOption.Url, urlPtr);
+            var result = NativeMethods.EasySetOptPointer(curl, CurlOption.Url, urlPtr);
             Assert.Equal(CurlCode.Ok, result);
+
+            if (OperatingSystem.IsWindows())
+            {
+                // The bundled BoringSSL build has no default CA bundle on Windows;
+                // raw handles must opt into the OS certificate store.
+                result = NativeMethods.EasySetOptLong(curl, CurlOption.SslOptions, (long)CurlSslOption.NativeCa);
+                Assert.Equal(CurlCode.Ok, result);
+            }
 
             result = NativeMethods.EasyImpersonate(curl, BrowserProfile.Chrome142.ToTargetString(), 1);
             Assert.Equal(CurlCode.Ok, result);

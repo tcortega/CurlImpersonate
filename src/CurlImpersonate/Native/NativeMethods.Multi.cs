@@ -44,10 +44,10 @@ internal static partial class NativeMethods
     internal static partial CurlMultiCode MultiSocketAction(nint curlm, nint sockfd, int evBitmask, out int runningHandles);
 
     /// <summary>
-    /// Set an option on a curl multi handle.
+    /// Set a C long option on a curl multi handle.
     /// </summary>
-    [LibraryImport(CurlLibrary, EntryPoint = "curl_multi_setopt")]
-    internal static partial CurlMultiCode MultiSetOpt(nint curlm, CurlMultiOption option, nint param);
+    [LibraryImport(ShimLibrary, EntryPoint = "shim_multi_setopt_long")]
+    internal static partial CurlMultiCode MultiSetOptLong(nint curlm, CurlMultiOption option, long param);
 
     /// <summary>
     /// Associate user data with a socket.

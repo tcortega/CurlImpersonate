@@ -7,6 +7,7 @@ namespace CurlImpersonate.Http.Benchmarks;
 /// Tests sequential requests to the same endpoint after initial connection is established.
 /// </summary>
 [MemoryDiagnoser]
+[AllStatisticsColumn]
 [RankColumn]
 [WarmupCount(BenchmarkConfig.WarmupCount)]
 [IterationCount(BenchmarkConfig.IterationCountMultiRequest)]

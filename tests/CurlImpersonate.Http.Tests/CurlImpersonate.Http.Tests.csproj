@@ -25,6 +25,7 @@
 
     <ItemGroup>
         <ProjectReference Include="../../src/CurlImpersonate.Http/CurlImpersonate.Http.csproj" />
+        <ProjectReference Include="../../src/CurlImpersonate.Http.DependencyInjection/CurlImpersonate.Http.DependencyInjection.csproj" />
     </ItemGroup>
 
 </Project>

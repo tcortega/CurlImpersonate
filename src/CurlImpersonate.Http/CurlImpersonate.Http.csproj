@@ -4,7 +4,13 @@
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <ImplicitUsings>enable</ImplicitUsings>
+
+        <PackageId>CurlImpersonate.Http</PackageId>
+        <Title>CurlImpersonate.Http</Title>
+        <Description>HttpMessageHandler implementation backed by curl-impersonate for browser TLS and HTTP fingerprint fidelity.</Description>
+        <PackageReleaseNotes>Targets CurlImpersonate native assets built from lexiforest/curl-impersonate v1.5.6.</PackageReleaseNotes>
 
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsAotCompatible>true</IsAotCompatible>
@@ -21,7 +27,6 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
-        <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.2" />
     </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using CurlImpersonate.Enums;
 
 namespace CurlImpersonate.Native.SafeHandles;
 
@@ -30,8 +31,9 @@ public sealed class SafeCurlMultiHandle : SafeHandle
     {
         if (handle != 0)
         {
-            NativeMethods.MultiCleanup(handle);
+            return NativeMethods.MultiCleanup(handle) == CurlMultiCode.Ok;
         }
+
         return true;
     }
 }

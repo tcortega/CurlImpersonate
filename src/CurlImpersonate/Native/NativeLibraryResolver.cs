@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -30,21 +29,17 @@ internal static class NativeLibraryResolver
 
     private static nint ResolveLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
     {
-        // Map library names to platform-specific names
         var platformLibraryName = GetPlatformLibraryName(libraryName);
 
-        // Try loading from various locations
         if (TryLoadFromRuntimesFolder(platformLibraryName, out var handle))
             return handle;
 
         if (TryLoadFromAssemblyDirectory(platformLibraryName, out handle) || TryLoadFromSystemPaths(platformLibraryName, out handle))
             return handle;
 
-        // Let the default resolver try
         if (NativeLibrary.TryLoad(libraryName, assembly, searchPath, out handle))
             return handle;
 
-        // Provide helpful error message
         throw new DllNotFoundException(
             $"Unable to load native library '{libraryName}'. " +
             $"Ensure the curl-impersonate native libraries are installed in one of these locations:\n" +
@@ -56,17 +51,28 @@ internal static class NativeLibraryResolver
 
     private static string GetPlatformLibraryName(string libraryName)
     {
-        if (OperatingSystem.IsWindows())
+        return GetPlatformLibraryName(
+            libraryName,
+            OperatingSystem.IsWindows(),
+            OperatingSystem.IsMacOS());
+    }
+
+    internal static string GetPlatformLibraryName(
+        string libraryName,
+        bool isWindows,
+        bool isMacOS)
+    {
+        if (isWindows)
         {
             return libraryName switch
             {
                 NativeMethods.ShimLibrary => "curl_shim.dll",
-                NativeMethods.CurlLibrary => "libcurl.dll",
+                NativeMethods.CurlLibrary => "libcurl-impersonate.dll",
                 _ => $"{libraryName}.dll"
             };
         }
 
-        if (OperatingSystem.IsMacOS())
+        if (isMacOS)
         {
             return libraryName switch
             {
@@ -85,37 +91,84 @@ internal static class NativeLibraryResolver
         };
     }
 
-    private static string GetRid()
+    internal static string GetRid()
     {
-        var arch = RuntimeInformation.OSArchitecture switch
+        return GetRid(
+            RuntimeInformation.OSArchitecture,
+            OperatingSystem.IsWindows(),
+            OperatingSystem.IsMacOS(),
+            RuntimeInformation.RuntimeIdentifier,
+            IsMuslLinux());
+    }
+
+    internal static string GetRid(
+        Architecture architecture,
+        bool isWindows,
+        bool isMacOS,
+        string runtimeIdentifier,
+        bool isMuslLinux)
+    {
+        var arch = architecture switch
         {
             Architecture.X64 => "x64",
             Architecture.Arm64 => "arm64",
-            Architecture.X86 => "x86",
-            Architecture.Arm => "arm",
-            _ => "x64"
+            _ => throw new PlatformNotSupportedException(
+                $"CurlImpersonate native assets support only x64 and arm64; current architecture is {architecture}.")
         };
 
-        if (OperatingSystem.IsWindows())
+        if (isWindows)
             return $"win-{arch}";
-        
-        if (OperatingSystem.IsMacOS())
+
+        if (isMacOS)
             return $"osx-{arch}";
-        
-        return $"linux-{arch}";
+
+        if (!runtimeIdentifier.StartsWith("linux", StringComparison.Ordinal))
+        {
+            throw new PlatformNotSupportedException(
+                $"CurlImpersonate native assets support Windows, macOS, and Linux; current runtime identifier is '{runtimeIdentifier}'.");
+        }
+
+        var linuxPrefix = isMuslLinux
+            || runtimeIdentifier.StartsWith("linux-musl-", StringComparison.Ordinal)
+            ? "linux-musl"
+            : "linux";
+
+        return $"{linuxPrefix}-{arch}";
     }
 
-    [SuppressMessage("SingleFile", "IL3000:Avoid accessing Assembly file path when publishing as a single file")]
-    private static string? GetBaseDirectory()
+    private static bool IsMuslLinux()
     {
-        var assemblyLocation = typeof(NativeLibraryResolver).Assembly.Location;
-        if (!string.IsNullOrEmpty(assemblyLocation))
+        if (!OperatingSystem.IsLinux())
+            return false;
+
+        if (RuntimeInformation.RuntimeIdentifier.StartsWith(
+            "linux-musl-",
+            StringComparison.Ordinal))
         {
-            return Path.GetDirectoryName(assemblyLocation);
+            return true;
         }
-        
-        return AppContext.BaseDirectory;
+
+        return HasMuslLoader("/lib") || HasMuslLoader("/usr/lib");
     }
+
+    private static bool HasMuslLoader(string directory)
+    {
+        try
+        {
+            return Directory.Exists(directory)
+                && Directory.EnumerateFiles(directory, "ld-musl-*.so.1").Any();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private static string GetBaseDirectory() => AppContext.BaseDirectory;
 
     private static bool TryLoadFromRuntimesFolder(string libraryName, out nint handle)
     {

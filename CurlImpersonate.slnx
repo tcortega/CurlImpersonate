@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/.root/" />
   <Folder Name="/src/">
+    <Project Path="src/CurlImpersonate.Http.DependencyInjection/CurlImpersonate.Http.DependencyInjection.csproj" />
     <Project Path="src/CurlImpersonate.Http/CurlImpersonate.Http.csproj" />
     <Project Path="src/CurlImpersonate/CurlImpersonate.csproj" />
   </Folder>

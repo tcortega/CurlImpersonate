@@ -1,0 +1,462 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - "v*"
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish packages to NuGet.org (only valid on a v* tag ref)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  # Used by native/scripts/fetch_dependencies.py to avoid anonymous API rate limits
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  managed:
+    name: Managed tests ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-24.04
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+          - rid: osx-x64
+            runner: macos-15-intel
+          - rid: osx-arm64
+            runner: macos-15
+          - rid: win-x64
+            runner: windows-2025
+          - rid: win-arm64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Build host native shim
+        run: python native/scripts/build_shim.py
+
+      - run: dotnet restore CurlImpersonate.slnx
+      - run: dotnet build CurlImpersonate.slnx --no-restore
+      - run: dotnet test CurlImpersonate.slnx --no-build --logger "trx;LogFileName=test-results.trx"
+
+  managed-musl:
+    name: Managed tests ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-musl-x64
+            runner: ubuntu-24.04
+          - rid: linux-musl-arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build shim and run tests in Alpine
+        shell: bash
+        run: |
+          docker run --rm \
+            -e CURL_IMPERSONATE_RID=${{ matrix.rid }} \
+            -e GITHUB_TOKEN \
+            -v "$PWD:/src" \
+            -w /src \
+            mcr.microsoft.com/dotnet/sdk:10.0-alpine \
+            sh -lc "apk add --no-cache bash build-base cmake python3 && python3 native/scripts/build_shim.py && dotnet test CurlImpersonate.slnx --logger 'console;verbosity=minimal'"
+
+  fingerprint-validation:
+    name: External fingerprint validation (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-2025]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Build host native shim
+        run: python native/scripts/build_shim.py
+
+      - run: dotnet restore CurlImpersonate.slnx
+      - run: dotnet build CurlImpersonate.slnx --no-restore
+      - name: Validate browser fingerprints
+        env:
+          CURLIMPERSONATE_RUN_FINGERPRINT_TESTS: "1"
+        run: >
+          dotnet test tests/CurlImpersonate.Tests/CurlImpersonate.Tests.csproj
+          --no-build
+          --filter "FullyQualifiedName~FingerprintTests"
+          --logger "trx;LogFileName=fingerprint-results.trx"
+
+  benchmark-validation:
+    name: Benchmark validation
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Build host native shim
+        run: python native/scripts/build_shim.py
+
+      - run: dotnet restore CurlImpersonate.slnx
+      - run: dotnet build CurlImpersonate.slnx --no-restore -c Release
+
+      - name: Ensure HTTPS development certificate exists
+        run: dotnet dev-certs https
+
+      - name: Run focused benchmark gate
+        run: >
+          dotnet run -c Release
+          --project benchmarks/CurlImpersonate.Http.Benchmarks
+          --
+          --filter "*Get100Bytes"
+          --artifacts artifacts/benchmarks
+
+      - name: Validate benchmark budgets
+        run: python3 tools/validate_benchmark_results.py --results-dir artifacts/benchmarks/results
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: artifacts/benchmarks/
+          if-no-files-found: error
+
+  native-linux:
+    name: Native ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-24.04
+            image: quay.io/pypa/manylinux2014_x86_64
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux2014_aarch64
+    steps:
+      - uses: actions/checkout@v4
+
+      # manylinux2014 (glibc 2.17) keeps the packaged shim's glibc floor at
+      # the same level as the upstream curl-impersonate release binaries.
+      - name: Build native shim in manylinux2014
+        shell: bash
+        run: |
+          docker run --rm \
+            -e CURL_IMPERSONATE_RID=${{ matrix.rid }} \
+            -e GITHUB_TOKEN \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ matrix.image }} \
+            bash -lc "export PATH=\$PATH:/root/.local/bin; command -v cmake >/dev/null || pipx install cmake; /opt/python/cp312-cp312/bin/python native/scripts/build_shim.py"
+
+      - name: Inspect Linux dependencies
+        shell: bash
+        run: |
+          ldd "runtimes/${{ matrix.rid }}/native/libcurl_shim.so"
+          readelf -d "runtimes/${{ matrix.rid }}/native/libcurl_shim.so"
+          python3 tools/inspect_native_dependencies.py --rid "${{ matrix.rid }}" --max-glibc 2.17
+          python3 tools/inspect_native_exports.py --rid "${{ matrix.rid }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: runtimes/${{ matrix.rid }}/native/
+          if-no-files-found: error
+
+  native-host:
+    name: Native ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: osx-x64
+            runner: macos-15-intel
+          - rid: osx-arm64
+            runner: macos-15
+          - rid: win-x64
+            runner: windows-2025
+          - rid: win-arm64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Build native shim
+        shell: bash
+        env:
+          CURL_IMPERSONATE_RID: ${{ matrix.rid }}
+          CMAKE_GENERATOR_PLATFORM: ${{ startsWith(matrix.rid, 'win-arm64') && 'ARM64' || '' }}
+        run: python native/scripts/build_shim.py
+
+      - name: Inspect macOS dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          otool -L "runtimes/${{ matrix.rid }}/native/libcurl_shim.dylib"
+          python3 tools/inspect_native_dependencies.py --rid "${{ matrix.rid }}"
+          python3 tools/inspect_native_exports.py --rid "${{ matrix.rid }}"
+
+      - name: Inspect Windows dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dumpbin = Get-Command dumpbin -ErrorAction SilentlyContinue
+          if (-not $dumpbin) {
+            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            $installPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            $dumpbin = Get-ChildItem "$installPath\VC\Tools\MSVC\*\bin\Host*\*\dumpbin.exe" | Select-Object -First 1
+          }
+          if (-not $dumpbin) {
+            throw "dumpbin.exe not found"
+          }
+          $dumpbinPath = if ($dumpbin.Source) { $dumpbin.Source } else { $dumpbin.FullName }
+          & $dumpbinPath /DEPENDENTS "runtimes/${{ matrix.rid }}/native/curl_shim.dll"
+          python tools/inspect_native_dependencies.py --rid "${{ matrix.rid }}" --dumpbin "$dumpbinPath"
+          python tools/inspect_native_exports.py --rid "${{ matrix.rid }}" --dumpbin "$dumpbinPath"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: runtimes/${{ matrix.rid }}/native/
+          if-no-files-found: error
+
+  native-musl:
+    name: Native ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-musl-x64
+            runner: ubuntu-24.04
+            image: mcr.microsoft.com/dotnet/sdk:10.0-alpine
+          - rid: linux-musl-arm64
+            runner: ubuntu-24.04-arm
+            image: mcr.microsoft.com/dotnet/sdk:10.0-alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build native shim in Alpine
+        shell: bash
+        run: |
+          docker run --rm \
+            -e CURL_IMPERSONATE_RID=${{ matrix.rid }} \
+            -e GITHUB_TOKEN \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ matrix.image }} \
+            sh -lc "apk add --no-cache bash build-base cmake python3 && python3 native/scripts/build_shim.py"
+
+      - name: Inspect musl dependencies
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ matrix.image }} \
+            sh -lc "apk add --no-cache python3 binutils && ldd runtimes/${{ matrix.rid }}/native/libcurl_shim.so && python3 tools/inspect_native_dependencies.py --rid ${{ matrix.rid }} && python3 tools/inspect_native_exports.py --rid ${{ matrix.rid }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: runtimes/${{ matrix.rid }}/native/
+          if-no-files-found: error
+
+  package:
+    name: Package and smoke test
+    runs-on: ubuntu-24.04
+    needs:
+      - managed
+      - managed-musl
+      - native-linux
+      - native-host
+      - native-musl
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: artifacts/native
+
+      - name: Assemble native runtime layout
+        shell: bash
+        run: |
+          mkdir -p package/runtimes
+          for dir in artifacts/native/native-*; do
+            rid="$(basename "$dir" | sed 's/^native-//')"
+            mkdir -p "package/runtimes/${rid}/native"
+            cp -v "$dir"/* "package/runtimes/${rid}/native/"
+          done
+          python3 tools/write_native_file_manifest.py \
+            --runtimes-root package/runtimes \
+            --output package/runtimes/native-files.json
+          find package/runtimes -maxdepth 4 -type f -print
+
+      - name: Resolve package version
+        id: package-version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+              echo "Tag '${GITHUB_REF_NAME}' is not a valid package version tag." >&2
+              exit 1
+            fi
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.package-version.outputs.version }}
+        run: |
+          mkdir -p nupkgs
+          version_args=()
+          if [ -n "$PACKAGE_VERSION" ]; then
+            version_args+=(/p:Version="$PACKAGE_VERSION")
+          fi
+          dotnet pack src/CurlImpersonate/CurlImpersonate.csproj \
+            -c Release -o nupkgs \
+            "${version_args[@]}" \
+            /p:NativeBinariesPath="$PWD/package"
+          dotnet pack src/CurlImpersonate.Http/CurlImpersonate.Http.csproj \
+            -c Release -o nupkgs \
+            "${version_args[@]}" \
+            /p:NativeBinariesPath="$PWD/package"
+          dotnet pack src/CurlImpersonate.Http.DependencyInjection/CurlImpersonate.Http.DependencyInjection.csproj \
+            -c Release -o nupkgs \
+            "${version_args[@]}" \
+            /p:NativeBinariesPath="$PWD/package"
+
+      - name: Package smoke and publish validation
+        shell: bash
+        run: |
+          python3 tools/package_smoke_test.py \
+            --package-dir nupkgs \
+            --publish-rid linux-x64 \
+            --publish-rid linux-arm64 \
+            --publish-rid linux-musl-x64 \
+            --publish-rid linux-musl-arm64 \
+            --publish-rid osx-x64 \
+            --publish-rid osx-arm64 \
+            --publish-rid win-x64 \
+            --publish-rid win-arm64 \
+            --publish-aot-rid linux-x64
+
+      - name: Release readiness validation
+        shell: bash
+        run: python3 tools/validate_release_readiness.py --package-dir nupkgs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            nupkgs/*.nupkg
+            nupkgs/*.snupkg
+          if-no-files-found: error
+
+  publish:
+    name: Publish to NuGet.org
+    runs-on: ubuntu-24.04
+    # Publication is a human-triggered gate: dispatch the workflow on the
+    # release tag with publish=true. Tag pushes only build and validate.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && inputs.publish
+      && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - package
+      - fingerprint-validation
+      - benchmark-validation
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: nupkgs
+
+      # Trusted Publishing: exchange the GitHub OIDC token for a short-lived
+      # NuGet API key. Requires a trusted publishing policy on nuget.org for
+      # this repository and workflow file.
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish packages
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          for package in nupkgs/*.nupkg; do
+            dotnet nuget push "$package" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+          for symbols in nupkgs/*.snupkg; do
+            dotnet nuget push "$symbols" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done

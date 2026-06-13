@@ -82,6 +82,19 @@ public sealed class BenchmarkServerProcess : IDisposable
                 return Path.GetFullPath(candidate);
         }
 
+        // Walk up from the runtime directory: BenchmarkDotNet runs generated
+        // projects nested under the original bin, and deterministic CI builds
+        // rewrite CallerFilePath to the unmapped /_/ source root.
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName,
+                "benchmarks",
+                "CurlImpersonate.Http.Benchmarks.Server",
+                "CurlImpersonate.Http.Benchmarks.Server.csproj");
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
         throw new FileNotFoundException(
             $"Could not find benchmark server project. CallerPath={callerPath}, CurrentDir={Directory.GetCurrentDirectory()}");
     }

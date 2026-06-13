@@ -10,21 +10,22 @@ target_compile_definitions(curl_shim PRIVATE CURL_STATICLIB)
 
 set_target_properties(curl_shim PROPERTIES
     POSITION_INDEPENDENT_CODE ON
-    PREFIX "lib"
 )
+
+# libcurl_shim.{so,dylib} on Unix, curl_shim.dll on Windows
+if(NOT WIN32)
+    set_target_properties(curl_shim PROPERTIES PREFIX "lib")
+endif()
 
 if(WIN32)
     # Windows: dynamic linking against vendor import libs
     target_link_directories(curl_shim PRIVATE ${VENDOR_DIR}/lib)
     target_link_libraries(curl_shim PRIVATE
-        libcurl ws2_32 crypt32 iphlpapi wldap32 advapi32 normaliz)
+        libcurl-impersonate_imp ws2_32 crypt32 iphlpapi wldap32 advapi32 normaliz)
 else()
-    if(APPLE)
-        # macOS: use globalized archive (N_PEXT cleared by build_shim.py)
-        set(CURL_ARCHIVE "${VENDOR_DIR}/lib/libcurl-impersonate-global.a")
-    else()
-        set(CURL_ARCHIVE "${VENDOR_DIR}/lib/libcurl-impersonate.a")
-    endif()
+    # macOS/Linux: use the globalized archive (hidden-visibility symbols
+    # promoted by build_shim.py so they can be re-exported)
+    set(CURL_ARCHIVE "${VENDOR_DIR}/lib/libcurl-impersonate-global.a")
 
     # macOS/Linux: static link the mega archive
     target_link_libraries(curl_shim PRIVATE
@@ -48,7 +49,12 @@ else()
         add_custom_command(TARGET curl_shim POST_BUILD
             COMMAND codesign --force -s - "$<TARGET_FILE:curl_shim>")
     else()
-        # Linux
+        # Linux: link with the C++ driver so the BoringSSL C++ objects in the
+        # mega archive get a C++ runtime, statically (-static-libstdc++ is a
+        # no-op under the C driver and the package must not depend on
+        # libstdc++/libgcc_s at runtime)
+        enable_language(CXX)
+        set_target_properties(curl_shim PROPERTIES LINKER_LANGUAGE CXX)
         target_link_options(curl_shim PRIVATE
             -static-libgcc -static-libstdc++
             "LINKER:--gc-sections"

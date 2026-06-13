@@ -177,3 +177,5 @@ __pycache__
 runtimes/
 curl_cffi/
 context/
+.claude/
+.codex/

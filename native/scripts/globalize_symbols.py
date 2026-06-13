@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """
-Globalize private-external symbols in a Mach-O static archive.
+Globalize hidden symbols in a Mach-O or ELF static archive.
 
-The curl-impersonate static archive is built with -fvisibility=hidden, marking
-all symbols as "private external" (N_PEXT). macOS's -exported_symbols_list
-cannot promote private externals to global exports, so we patch the nlist
-entries to clear the N_PEXT bit for symbols we need to export.
+The curl-impersonate static archives are built with -fvisibility=hidden:
+Mach-O objects mark symbols "private external" (N_PEXT) and ELF objects mark
+them STV_HIDDEN. Neither macOS's -exported_symbols_list nor a GNU linker
+version script can promote such symbols to dynamic exports, so we patch the
+object symbol tables (clear N_PEXT / clear st_other visibility) for the
+symbols we need to export before linking.
 
-This script parses the BSD ar format directly to avoid name collision issues
-with `ar -x` when multiple members share the same filename.
+This script parses the ar format directly to avoid name collision issues
+with `ar -x` when multiple members share the same filename. Both BSD ar
+(Mach-O, "#1/N" extended names) and GNU ar (ELF, "//" long-name table) are
+handled; member sizes never change so patching is done in place.
 
 Usage:
     python globalize_symbols.py <archive.a> <symbols_file> <output.a>
+
+The symbols file uses Mach-O spelling (leading underscore); the underscore is
+stripped automatically when matching ELF symbol names.
 """
 
 import shutil
@@ -24,6 +31,11 @@ MH_MAGIC_64 = 0xFEEDFACF
 LC_SYMTAB = 0x02
 N_PEXT = 0x10  # private external bit
 N_EXT = 0x01   # external bit
+
+# ELF constants
+ELF_MAGIC = b"\x7fELF"
+SHT_SYMTAB = 2
+STV_VISIBILITY_MASK = 0x3  # low two bits of st_other
 
 AR_MAGIC = b"!<arch>\n"
 AR_HEADER_SIZE = 60
@@ -99,12 +111,67 @@ def globalize_macho(data: bytearray, symbols_to_globalize: set) -> int:
     return patched
 
 
+def globalize_elf(data: bytearray, symbols_to_globalize: set) -> int:
+    """Patch a 64-bit little-endian ELF object to clear st_other visibility
+    (STV_HIDDEN -> STV_DEFAULT) for specified symbols.
+
+    Returns the number of symbols patched.
+    """
+    if len(data) < 64 or data[:4] != ELF_MAGIC:
+        return 0
+    if data[4] != 2 or data[5] != 1:  # ELFCLASS64, ELFDATA2LSB only
+        return 0
+
+    e_shoff = struct.unpack_from("<Q", data, 0x28)[0]
+    e_shentsize, e_shnum = struct.unpack_from("<HH", data, 0x3A)
+    if e_shoff == 0:
+        return 0
+    if e_shnum == 0:
+        # Extended section count lives in sh_size of section header 0
+        e_shnum = struct.unpack_from("<Q", data, e_shoff + 32)[0]
+
+    patched = 0
+    sym_entry_size = 24  # sizeof(Elf64_Sym)
+
+    for index in range(e_shnum):
+        sh_off = e_shoff + index * e_shentsize
+        sh_type = struct.unpack_from("<I", data, sh_off + 4)[0]
+        if sh_type != SHT_SYMTAB:
+            continue
+
+        # Section header: sh_offset(24), sh_size(32), sh_link(40)
+        sym_off, sym_size = struct.unpack_from("<QQ", data, sh_off + 24)
+        sh_link = struct.unpack_from("<I", data, sh_off + 40)[0]
+        str_off = struct.unpack_from(
+            "<Q", data, e_shoff + sh_link * e_shentsize + 24
+        )[0]
+
+        for entry_off in range(sym_off, sym_off + sym_size, sym_entry_size):
+            # Elf64_Sym: st_name(4), st_info(1), st_other(1), ...
+            st_name = struct.unpack_from("<I", data, entry_off)[0]
+            st_other = data[entry_off + 5]
+            if not (st_other & STV_VISIBILITY_MASK):
+                continue
+
+            name_start = str_off + st_name
+            name_end = data.index(b"\x00", name_start)
+            sym_name = bytes(data[name_start:name_end])
+
+            if sym_name in symbols_to_globalize:
+                data[entry_off + 5] = st_other & ~STV_VISIBILITY_MASK
+                patched += 1
+
+    return patched
+
+
 def process_archive(archive_path: Path, symbols_file: Path, output_path: Path):
     """Patch the archive in-place by parsing BSD ar format directly.
 
     This avoids `ar -x` which loses members when filenames collide.
     """
     symbols = parse_symbols_file(symbols_file)
+    # ELF symbol names have no Mach-O underscore prefix
+    elf_symbols = {s[1:] if s.startswith(b"_") else s for s in symbols}
     print(f"Symbols to globalize: {len(symbols)}")
 
     data = bytearray(archive_path.read_bytes())
@@ -136,10 +203,10 @@ def process_archive(archive_path: Path, symbols_file: Path, output_path: Path):
         # Get the member name for diagnostics
         name_field = header[0:16].decode("ascii").strip()
 
-        # Skip symbol table and string table entries
-        if not name_field.startswith("#1/") and (
-            name_field.startswith("/") or name_field.startswith("__.SYMDEF")
-        ):
+        # Skip ar metadata: BSD "__.SYMDEF*" index, GNU "/" symbol index and
+        # "//" long-name table. GNU "/NN" entries are real members whose name
+        # lives in the long-name table.
+        if name_field in ("/", "//") or name_field.startswith("__.SYMDEF"):
             pass  # ar metadata, skip patching
         else:
             # BSD ar may have extended names: "#1/NN" means NN bytes of name
@@ -149,11 +216,14 @@ def process_archive(archive_path: Path, symbols_file: Path, output_path: Path):
                 name_len = int(name_field[3:])
                 obj_offset = member_start + name_len
 
-            # Try to patch this member's Mach-O data
+            # Try to patch this member's object data (Mach-O or ELF)
             member_data = data[obj_offset:member_end]
             if len(member_data) >= 4:
                 member_buf = bytearray(member_data)
-                patched = globalize_macho(member_buf, symbols)
+                if member_data[:4] == ELF_MAGIC:
+                    patched = globalize_elf(member_buf, elf_symbols)
+                else:
+                    patched = globalize_macho(member_buf, symbols)
                 if patched > 0:
                     data[obj_offset:member_end] = member_buf
                     total_patched += patched

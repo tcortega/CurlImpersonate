@@ -663,4 +663,20 @@ public enum CurlOption
     Http2NoPriority = 1021,
     /// <summary>Proxy credential no reuse (curl-impersonate).</summary>
     ProxyCredentialNoReuse = 1022,
+    /// <summary>Split cookies into separate Cookie headers (curl-impersonate).</summary>
+    SplitCookies = 1023,
+    /// <summary>Multipart form boundary style (curl-impersonate).</summary>
+    FormBoundary = 11024,
+    /// <summary>HTTP/3 pseudo headers order (curl-impersonate).</summary>
+    Http3PseudoHeadersOrder = 11025,
+    /// <summary>HTTP/3 settings (curl-impersonate).</summary>
+    Http3Settings = 11026,
+    /// <summary>QUIC transport parameters (curl-impersonate).</summary>
+    QuicTransportParameters = 11027,
+    /// <summary>HTTP/3 signature hash algorithms (curl-impersonate).</summary>
+    Http3SigHashAlgs = 11028,
+    /// <summary>HTTP/3 TLS extension order (curl-impersonate).</summary>
+    Http3TlsExtensionOrder = 11029,
+    /// <summary>Normal HTTP header order (curl-impersonate).</summary>
+    HttpHeaderOrder = 11030,
 }

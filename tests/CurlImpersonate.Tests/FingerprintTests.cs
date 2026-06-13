@@ -9,10 +9,13 @@ namespace CurlImpersonate.Tests;
 
 public class FingerprintTests(ITestOutputHelper output)
 {
+    private const string RunFingerprintTestsEnvironmentVariable = "CURLIMPERSONATE_RUN_FINGERPRINT_TESTS";
     private const string FingerprintUrl = "https://tls.browserleaks.com/json";
 
     private static string PerformRequest(BrowserProfile? profile = null)
     {
+        RequireFingerprintValidationEnabled();
+
         var curl = NativeMethods.EasyInit();
         Assert.NotEqual(0, curl);
 
@@ -34,8 +37,16 @@ public class FingerprintTests(ITestOutputHelper output)
 
             try
             {
-                var result = NativeMethods.EasySetOpt(curl, CurlOption.Url, urlPtr);
+                var result = NativeMethods.EasySetOptPointer(curl, CurlOption.Url, urlPtr);
                 Assert.Equal(CurlCode.Ok, result);
+
+                if (OperatingSystem.IsWindows())
+                {
+                    // The bundled BoringSSL build has no default CA bundle on
+                    // Windows; raw handles must opt into the OS certificate store.
+                    result = NativeMethods.EasySetOptLong(curl, CurlOption.SslOptions, (long)CurlSslOption.NativeCa);
+                    Assert.Equal(CurlCode.Ok, result);
+                }
 
                 if (profile.HasValue)
                 {
@@ -45,11 +56,11 @@ public class FingerprintTests(ITestOutputHelper output)
 
                 // Enable automatic decompression
                 var acceptEncoding = Marshal.StringToHGlobalAnsi("");
-                result = NativeMethods.EasySetOpt(curl, CurlOption.AcceptEncoding, acceptEncoding);
+                result = NativeMethods.EasySetOptPointer(curl, CurlOption.AcceptEncoding, acceptEncoding);
                 Marshal.FreeHGlobal(acceptEncoding);
                 Assert.Equal(CurlCode.Ok, result);
 
-                result = NativeMethods.EasySetOpt(curl, CurlOption.WriteFunction, callbackPtr);
+                result = NativeMethods.EasySetOptPointer(curl, CurlOption.WriteFunction, callbackPtr);
                 Assert.Equal(CurlCode.Ok, result);
 
                 result = NativeMethods.EasyPerform(curl);
@@ -64,6 +75,19 @@ public class FingerprintTests(ITestOutputHelper output)
                 NativeMethods.EasyCleanup(curl);
             }
         }
+    }
+
+    private static void RequireFingerprintValidationEnabled()
+    {
+        var value = Environment.GetEnvironmentVariable(RunFingerprintTestsEnvironmentVariable);
+        if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Assert.Skip(
+            $"Set {RunFingerprintTestsEnvironmentVariable}=1 to run external fingerprint validation against {FingerprintUrl}.");
     }
 
     [Fact]

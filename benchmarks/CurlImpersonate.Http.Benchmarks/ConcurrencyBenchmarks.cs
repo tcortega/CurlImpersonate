@@ -5,7 +5,10 @@ namespace CurlImpersonate.Http.Benchmarks;
 /// <summary>
 /// Benchmarks measuring concurrent request handling performance.
 /// </summary>
+// ThreadingDiagnoser fails BenchmarkDotNet validation on this runtime and
+// silently skips every benchmark in the class, so it stays off.
 [MemoryDiagnoser]
+[AllStatisticsColumn]
 [RankColumn]
 [WarmupCount(BenchmarkConfig.WarmupCount)]
 [IterationCount(BenchmarkConfig.IterationCountMultiRequest)]
@@ -15,6 +18,7 @@ public class ConcurrencyBenchmarks
     private static BenchmarkServerProcess _server = null!;
     private HttpClient _nativeClient = null!;
     private HttpClient _curlClient = null!;
+    private HttpClient _curlOwnLoopClient = null!;
 
     [Params(10, 50, 100)]
     public int ConcurrentRequests { get; set; }
@@ -37,6 +41,13 @@ public class ConcurrencyBenchmarks
             InsecureSkipVerify = true,
             MaxPoolSize = 200
         }));
+
+        _curlOwnLoopClient = new(new CurlHandler(new()
+        {
+            InsecureSkipVerify = true,
+            MaxPoolSize = 200,
+            UseSharedEventLoop = false
+        }));
     }
 
     [GlobalCleanup]
@@ -44,6 +55,7 @@ public class ConcurrencyBenchmarks
     {
         _nativeClient.Dispose();
         _curlClient.Dispose();
+        _curlOwnLoopClient.Dispose();
         _server.Dispose();
     }
 
@@ -65,6 +77,17 @@ public class ConcurrencyBenchmarks
         for (var i = 0; i < ConcurrentRequests; i++)
         {
             tasks[i] = _curlClient.GetStringAsync($"{BenchmarkServerProcess.BaseUrl}/get");
+        }
+        await Task.WhenAll(tasks);
+    }
+
+    [Benchmark]
+    public async Task Curl_ConcurrentGets_OwnLoop()
+    {
+        var tasks = new Task<string>[ConcurrentRequests];
+        for (var i = 0; i < ConcurrentRequests; i++)
+        {
+            tasks[i] = _curlOwnLoopClient.GetStringAsync($"{BenchmarkServerProcess.BaseUrl}/get");
         }
         await Task.WhenAll(tasks);
     }
