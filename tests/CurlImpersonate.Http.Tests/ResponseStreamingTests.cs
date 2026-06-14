@@ -133,6 +133,55 @@ public sealed class ResponseStreamingTests
         }
     }
 
+    [Fact]
+    public async Task SendAsync_StreamResponseBodies_SurvivesDisposeOfOtherHandler()
+    {
+        // Handler A: streaming, blocked mid-stream after headers.
+        using var serverA = new StreamingServer();
+        var releaseA = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handlerA = new CurlHandler(new CurlHandlerOptions
+        {
+            FollowRedirects = false,
+            StreamResponseBodies = true
+        });
+        using var clientA = new HttpClient(handlerA);
+
+        var serverTaskA = serverA.AcceptAndStreamAsync("payload-A", releaseA.Task);
+        using var requestA = new HttpRequestMessage(HttpMethod.Get, serverA.BaseUri);
+        using var responseA = await clientA.SendAsync(
+            requestA,
+            HttpCompletionOption.ResponseHeadersRead,
+            TestContext.Current.CancellationToken);
+
+        await serverA.HeadersSent.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Handler B: default options (shared event loop), runs a complete request
+        // then is disposed while A is still mid-stream.
+        using (var serverB = new StreamingServer())
+        {
+            var releaseB = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var serverTaskB = serverB.AcceptAndStreamAsync("payload-B", releaseB.Task);
+            var handlerB = new CurlHandler(); // default => shared event loop
+            var clientB = new HttpClient(handlerB);
+            using var requestB = new HttpRequestMessage(HttpMethod.Get, serverB.BaseUri);
+            var sendB = clientB.SendAsync(requestB, TestContext.Current.CancellationToken);
+            releaseB.SetResult();
+            using var responseB = await sendB.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal("payload-B", await responseB.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            await serverTaskB.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            clientB.Dispose();
+            handlerB.Dispose(); // dispose the shared-loop handler while A is mid-stream
+        }
+
+        // Handler A's stream must still complete cleanly after B's disposal.
+        releaseA.SetResult();
+        var bodyA = await responseA.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        await serverTaskA.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal("payload-A", bodyA);
+    }
+
     private sealed class StreamingServer : IDisposable
     {
         private readonly TcpListener _listener;
