@@ -12,7 +12,10 @@ using var client = new HttpClient(new CurlHandler(new() { AllowAutoRedirect = tr
 
 Construction differs in one way: `CurlHandler` takes a `CurlHandlerOptions`
 object up front and snapshots it, where `HttpClientHandler` exposes mutable
-properties. Set everything in the options initializer.
+properties. The snapshot is taken in the constructor, so mutating the original
+`CurlHandlerOptions` instance after the handler is created has no effect on that
+handler — set everything in the options initializer, and use a fresh options
+object per handler when you need different settings.
 
 ## Property mapping
 

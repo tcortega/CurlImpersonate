@@ -29,7 +29,9 @@ response.EnsureSuccessStatusCode();
 `UseCookies`, `Proxy` (`IWebProxy` with bypass and credentials), `UseProxy`,
 and `MaxConnectionsPerServer` keep their names and semantics. The full
 property mapping table, including what is intentionally unsupported and why,
-is in [the migration guide](docs/httpclienthandler-migration.md).
+is in [the migration guide](docs/httpclienthandler-migration.md). Options are
+snapshotted when the handler is constructed; changing the `CurlHandlerOptions`
+instance afterward does not affect an already-created handler.
 
 ## IHttpClientFactory And Dependency Injection
 
