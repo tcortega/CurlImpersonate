@@ -230,7 +230,7 @@ internal sealed class CurlEventLoop : IDisposable
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[CurlEventLoop] Unexpected error: {ex}");
+                CurlDiagnostics.Report($"[CurlEventLoop] Unexpected error: {ex}");
                 FailPendingTransfers(ex);
             }
         }
@@ -421,7 +421,7 @@ internal sealed class CurlEventLoop : IDisposable
                 return;
             }
 
-            Console.Error.WriteLine(
+            CurlDiagnostics.Report(
                 $"[CurlEventLoop] curl_multi_wakeup failed: {CurlMultiException.GetErrorMessage(code)}");
         }
         finally

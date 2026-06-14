@@ -12,6 +12,9 @@ public class FingerprintTests(ITestOutputHelper output)
     private const string RunFingerprintTestsEnvironmentVariable = "CURLIMPERSONATE_RUN_FINGERPRINT_TESTS";
     private const string FingerprintUrl = "https://tls.browserleaks.com/json";
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private unsafe delegate nuint WriteCallbackDelegate(byte* ptr, nuint size, nuint nmemb, nint userdata);
+
     private static string PerformRequest(BrowserProfile? profile = null)
     {
         RequireFingerprintValidationEnabled();
@@ -24,7 +27,7 @@ public class FingerprintTests(ITestOutputHelper output)
 
         unsafe
         {
-            WriteCallback writeCallback = (ptr, size, nmemb, userdata) =>
+            WriteCallbackDelegate writeCallback = (ptr, size, nmemb, userdata) =>
             {
                 var totalSize = size * nmemb;
                 var data = new byte[totalSize];

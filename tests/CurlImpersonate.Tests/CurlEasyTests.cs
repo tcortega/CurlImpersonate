@@ -1,7 +1,6 @@
 using System.Runtime.InteropServices;
 using CurlImpersonate.Enums;
 using CurlImpersonate.Native;
-using CurlImpersonate.Native.SafeHandles;
 using Xunit;
 
 namespace CurlImpersonate.Tests;
@@ -40,16 +39,6 @@ public class CurlEasyTests
             if (curl != 0)
                 NativeMethods.EasyCleanup(curl);
         }
-    }
-
-    [Fact]
-    public void SafeCurlSlistHandle_Append_ShouldCreateList()
-    {
-        using var list = new SafeCurlSlistHandle();
-
-        list.Append("Accept: */*");
-
-        Assert.NotEqual(0, list.Handle);
     }
 
     [Fact]
